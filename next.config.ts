@@ -35,5 +35,5 @@ const nextConfig: NextConfig = {
     ],
   },
 };
-
+// Trigger rebuild
 export default nextConfig;

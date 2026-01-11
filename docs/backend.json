@@ -1,0 +1,210 @@
+{
+  "entities": {
+    "BudgetResult": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BudgetResult",
+      "type": "object",
+      "description": "Represents the result of a budget analysis, including revenue, costs, and other financial metrics.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Budget Result entry."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp indicating when the budget result was generated.",
+          "format": "date-time"
+        },
+        "retailRevenue": {
+          "type": "number",
+          "description": "Retail revenue for the period."
+        },
+        "wholesaleRevenue": {
+          "type": "number",
+          "description": "Wholesale revenue for the period."
+        },
+        "totalCosts": {
+          "type": "number",
+          "description": "Total costs for the period."
+        },
+        "costsByBudgetHolder": {
+          "type": "array",
+          "description": "Array of cost breakdowns by budget holder.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "anomalies": {
+          "type": "array",
+          "description": "Array of anomaly detections for the period.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N BudgetResult)"
+        }
+      },
+      "required": [
+        "id",
+        "timestamp",
+        "retailRevenue",
+        "wholesaleRevenue",
+        "totalCosts",
+        "costsByBudgetHolder",
+        "userId"
+      ]
+    },
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile within the application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User Profile entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's display name."
+        },
+        "role": {
+          "type": "string",
+          "description": "User's role (e.g., admin, viewer)."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName",
+        "role"
+      ]
+    },
+    "FileUpload": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FileUpload",
+      "type": "object",
+      "description": "Represents a file upload record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the File Upload entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N FileUpload)"
+        },
+        "filename": {
+          "type": "string",
+          "description": "Name of the uploaded file."
+        },
+        "uploadTimestamp": {
+          "type": "string",
+          "description": "Timestamp of when the file was uploaded.",
+          "format": "date-time"
+        },
+        "fileType": {
+          "type": "string",
+          "description": "Type of file uploaded (e.g., GL Entries, Budget Mapping)."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "filename",
+        "uploadTimestamp",
+        "fileType"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores user profile information. The 'userId' parameter identifies the user. This path enables path-based ownership for private user data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/budget_results/{budgetResultId}",
+        "definition": {
+          "entityName": "BudgetResult",
+          "schema": {
+            "$ref": "#/backend/entities/BudgetResult"
+          },
+          "description": "Stores budget result data for a specific user. Includes denormalized 'userId' for authorization independence, allowing direct validation of ownership within security rules without 'get()' calls. 'budgetResultId' is the unique ID for the budget result. This enables secure listing of results specific to a user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "budgetResultId",
+              "description": "The unique identifier for the budget result."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/file_uploads/{fileUploadId}",
+        "definition": {
+          "entityName": "FileUpload",
+          "schema": {
+            "$ref": "#/backend/entities/FileUpload"
+          },
+          "description": "Stores file upload metadata for a specific user. Includes denormalized 'userId' for authorization independence. 'fileUploadId' is the unique ID for the file upload. This enables secure listing of file uploads specific to a user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "fileUploadId",
+              "description": "The unique identifier for the file upload."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "role",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Collection to manage admin roles. The existence of a document with a user ID implies admin privileges. Existence over Content, to prevent data modification.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the Budget Insights application. User profiles and budget results are stored in separate collections. File uploads are linked to users and timestamped. Authorization independence is achieved by storing the 'userId' within each `BudgetResult` and `FileUpload` document, eliminating the need for `get()` calls in security rules to verify ownership. This allows for atomic operations (transactions/batches) without hierarchical dependencies. The structure supports QAPs by segregating data based on ownership and role, allowing for secure `list` operations using path-based rules. The `roles_admin` collection enables global role-based access control."
+  }
+}

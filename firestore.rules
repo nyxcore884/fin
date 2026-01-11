@@ -1,0 +1,140 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model, augmented with a global 'admin' role.
+ * All user-specific data is private by default and can only be accessed by the data's owner or an administrator.
+ * The primary goal is to ensure high security and data privacy while maintaining flexibility for application development.
+ *
+ * Data Structure: User data is hierarchically organized under the /users/{userId} path. Each user's private
+ * content, such as budget results and file uploads, is stored in subcollections within their own document tree.
+ * A top-level /roles_admin collection is used to manage global administrator privileges, where the existence of a
+ * user's UID as a document ID grants them admin access.
+ *
+ * Key Security Decisions:
+ * - User Listing Disabled: The root /users collection cannot be listed to protect user privacy and prevent enumeration.
+ * - Admin Access: Users with a document in the /roles_admin collection have read-only access to all user data.
+ *   This allows for administrative oversight without granting modification rights, which should be handled server-side.
+ * - Admin Role Management: The /roles_admin collection is read-only from the client-side. This is a critical
+ *   security measure to prevent any user from elevating their own privileges. Admin roles must be managed
+ *   through a trusted server environment (e.g., Cloud Functions with the Admin SDK).
+ * - Self-Creation of Profiles: Users are permitted to create their own user profile document upon signing up.
+ *
+ * Denormalization for Authorization: To ensure fast and secure authorization, all user-generated content documents
+ * (e.g., BudgetResult, FileUpload) must contain a denormalized 'userId' field. This allows security rules to validate
+ * ownership directly from the document's data, avoiding slow, costly, and sometimes impossible cross-document `get()` calls.
+ *
+ * Structural Segregation: The ruleset naturally separates private user data into nested subcollections under /users/{userId},
+ * which provides a clear and secure boundary for each user's information.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions
+    // --------------------------------
+
+    /**
+     * Checks if a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the provided userId.
+     * This is the foundation of the user-ownership model.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks for ownership and ensures the document already exists.
+     * CRITICAL for all update and delete operations to prevent acting on non-existent data.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Checks if the authenticated user has administrative privileges.
+     * This is determined by the existence of their UID as a document in the roles_admin collection.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * Checks if the user is either the direct owner or an administrator.
+     * Used for granting read access to user-owned documents.
+     */
+    function isOwnerOrAdmin(userId) {
+      return isOwner(userId) || isAdmin();
+    }
+
+
+    // Collection Rules
+    // --------------------------------
+
+    /**
+     * @description Manages user profile documents.
+     * @path /users/{userId}
+     * @allow (get) An authenticated user 'user_123' reading their own profile at /users/user_123.
+     * @allow (create) A new user 'user_123' creating their own profile at /users/user_123.
+     * @deny (list) Any user attempting to list all documents in the /users collection.
+     * @deny (update) User 'user_456' trying to update the profile of 'user_123'.
+     * @principle Restricts access to a user's own data tree and allows self-creation of a root profile.
+     */
+    match /users/{userId} {
+      allow get: if isOwnerOrAdmin(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Manages user-specific budget calculation results.
+     * @path /users/{userId}/budget_results/{budgetResultId}
+     * @allow (create) User 'user_123' creating a new budget result in their own subcollection.
+     * @allow (get, list, update, delete) User 'user_123' managing their own budget results.
+     * @deny (create) User 'user_456' trying to create a budget result under /users/user_123/...
+     * @deny (update) A user trying to change the 'userId' field on an existing document.
+     * @principle Enforces document ownership for writes and validates relational integrity via the denormalized 'userId' field.
+     */
+    match /users/{userId}/budget_results/{budgetResultId} {
+      allow get, list: if isOwnerOrAdmin(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages metadata for files uploaded by users.
+     * @path /users/{userId}/file_uploads/{fileUploadId}
+     * @allow (create) User 'user_123' creating a new file upload record in their own subcollection.
+     * @allow (get, list, update, delete) User 'user_123' managing their own file upload records.
+     * @deny (create) User 'user_456' trying to create a file record under /users/user_123/...
+     * @deny (update) A user trying to change the 'userId' field on an existing document.
+     * @principle Enforces document ownership for writes and validates relational integrity via the denormalized 'userId' field.
+     */
+    match /users/{userId}/file_uploads/{fileUploadId} {
+      allow get, list: if isOwnerOrAdmin(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages administrator roles. Existence of a doc implies admin status.
+     * @path /roles_admin/{userId}
+     * @allow (get, list) An existing admin reading the list of other admins.
+     * @deny (create, update, delete) Any user trying to add, change, or remove a document to grant or revoke admin rights.
+     * @principle Secures a critical collection by making it read-only from the client. Role management must be done server-side.
+     */
+    match /roles_admin/{userId} {
+      allow get, list: if isAdmin();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

@@ -10,10 +10,10 @@ import { firebaseConfig } from './config';
 
 // Define the shape of the context
 interface FirebaseContextState {
-  firebaseApp: FirebaseApp;
-  auth: Auth;
-  firestore: Firestore;
-  storage: FirebaseStorage;
+  firebaseApp: FirebaseApp | null;
+  auth: Auth | null;
+  firestore: Firestore | null;
+  storage: FirebaseStorage | null;
   user: User | null;
   isUserLoading: boolean;
 }
@@ -22,24 +22,20 @@ interface FirebaseContextState {
 const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
 // --- Singleton Pattern for Firebase Initialization ---
-let firebaseApp: FirebaseApp;
-let auth: Auth;
-let firestore: Firestore;
-let storage: FirebaseStorage;
-
 const initializeFirebaseServices = () => {
   if (getApps().length === 0) {
-    firebaseApp = initializeApp(firebaseConfig);
-    auth = getAuth(firebaseApp);
-    firestore = getFirestore(firebaseApp);
-    storage = getStorage(firebaseApp);
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+    const firestore = getFirestore(firebaseApp);
+    const storage = getStorage(firebaseApp);
+    return { firebaseApp, auth, firestore, storage };
   } else {
-    firebaseApp = getApp();
-    auth = getAuth(firebaseApp);
-    firestore = getFirestore(firebaseApp);
-    storage = getStorage(firebaseApp);
+    const firebaseApp = getApp();
+    const auth = getAuth(firebaseApp);
+    const firestore = getFirestore(firebaseApp);
+    const storage = getStorage(firebaseApp);
+    return { firebaseApp, auth, firestore, storage };
   }
-  return { firebaseApp, auth, firestore, storage };
 };
 // --- End Singleton Pattern ---
 
@@ -47,28 +43,37 @@ const initializeFirebaseServices = () => {
  * The main provider component. It initializes Firebase and makes services and user state available to its children.
  */
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
-  // Memoize the Firebase services to prevent re-initialization on re-renders.
-  const firebaseServices = useMemo(initializeFirebaseServices, []);
-  
+  const [services, setServices] = useState<{
+    firebaseApp: FirebaseApp;
+    auth: Auth;
+    firestore: Firestore;
+    storage: FirebaseStorage;
+  } | null>(null);
+
   const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true);
 
   useEffect(() => {
-    const { auth } = firebaseServices;
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const initializedServices = initializeFirebaseServices();
+    setServices(initializedServices);
+
+    const unsubscribe = onAuthStateChanged(initializedServices.auth, (user) => {
       setUser(user);
       setIsUserLoading(false);
     });
 
     // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, [firebaseServices]);
+  }, []);
 
   const value = useMemo(() => ({
-    ...firebaseServices,
+    firebaseApp: services?.firebaseApp || null,
+    auth: services?.auth || null,
+    firestore: services?.firestore || null,
+    storage: services?.storage || null,
     user,
     isUserLoading,
-  }), [firebaseServices, user, isUserLoading]);
+  }), [services, user, isUserLoading]);
 
   return (
     <FirebaseContext.Provider value={value}>
@@ -88,10 +93,10 @@ const useFirebase = (): FirebaseContextState => {
 };
 
 // Export individual service hooks for convenience
-export const useFirebaseApp = (): FirebaseApp => useFirebase().firebaseApp;
-export const useAuth = (): Auth => useFirebase().auth;
-export const useFirestore = (): Firestore => useFirebase().firestore;
-export const useStorage = (): FirebaseStorage => useFirebase().storage;
+export const useFirebaseApp = (): FirebaseApp | null => useFirebase().firebaseApp;
+export const useAuth = (): Auth | null => useFirebase().auth;
+export const useFirestore = (): Firestore | null => useFirebase().firestore;
+export const useStorage = (): FirebaseStorage | null => useFirebase().storage;
 export const useUser = () => {
     const { user, isUserLoading } = useFirebase();
     return { user, isUserLoading };

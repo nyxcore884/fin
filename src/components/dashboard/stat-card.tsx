@@ -11,7 +11,7 @@ type StatCardProps = {
 
 export function StatCard({ name, value, change, changeType }: StatCardProps) {
   return (
-    <Card className="h-full bg-card/80 backdrop-blur-sm transition-all hover:border-primary/50">
+    <Card className="h-full bg-card/80 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:shadow-glow-primary hover:scale-[1.02] hover:-translate-y-1">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{name}</CardTitle>
       </CardHeader>

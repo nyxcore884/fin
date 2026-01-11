@@ -51,7 +51,7 @@ export function ReportsTable({ reports }: ReportsTableProps) {
           </TableHeader>
           <TableBody>
             {reports.map((report) => (
-              <TableRow key={report.id}>
+              <TableRow key={report.id} className="transition-colors hover:bg-muted/50">
                 <TableCell className="font-medium">{report.name}</TableCell>
                 <TableCell>{report.date}</TableCell>
                 <TableCell>

@@ -33,7 +33,7 @@ export function AnomaliesList({ anomalies }: AnomaliesListProps) {
       <CardContent>
         <div className="flex flex-col gap-4">
           {anomalies.map((anomaly) => (
-            <div key={anomaly.id} className="flex items-start gap-4 rounded-lg border border-transparent p-2 transition-colors hover:bg-muted/50">
+            <div key={anomaly.id} className="group flex items-start gap-4 rounded-lg border border-transparent p-3 transition-all duration-300 hover:border-primary/20 hover:bg-gradient-primary-accent">
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold">{anomaly.metric}</h4>

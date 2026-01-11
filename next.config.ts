@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    // This is required to allow the Next.js dev server to accept requests from the
+    // Google Cloud Workstations environment.
+    allowedDevOrigins: ["*.cloudworkstations.dev"],
+  },
   images: {
     remotePatterns: [
       {
@@ -23,7 +28,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       {
-        protocol: 'https',
+        protocol: 'https,
         hostname: 'picsum.photos',
         port: '',
         pathname: '/**',

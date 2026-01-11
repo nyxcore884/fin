@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/theme-provider";
-import { FloatingAIChat } from "@/components/ai/floating-ai-chat";
+import FloatingAIChat from "@/components/FloatingAIChat";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
 
 export const metadata: Metadata = {

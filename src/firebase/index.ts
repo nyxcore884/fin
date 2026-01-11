@@ -16,7 +16,7 @@ type FirebaseServices = {
 
 let firebaseServices: FirebaseServices | null = null;
 
-// IMPORTANT: This function now ensures a SINGLE, a reliable initialization.
+// IMPORTANT: This function now ensures a SINGLE, reliable initialization.
 export function initializeFirebase(): FirebaseServices {
   if (firebaseServices) {
     return firebaseServices;

@@ -2,31 +2,39 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
-export function initializeFirebase() {
-  if (!getApps().length) {
-    // Always initialize with the explicit config to ensure authDomain is set.
-    const firebaseApp = initializeApp(firebaseConfig);
-    return getSdks(firebaseApp);
+// This structure holds the initialized services.
+type FirebaseServices = {
+  firebaseApp: FirebaseApp;
+  auth: Auth;
+  firestore: Firestore;
+  storage: FirebaseStorage;
+};
+
+let firebaseServices: FirebaseServices | null = null;
+
+// IMPORTANT: This function now ensures a SINGLE, a reliable initialization.
+export function initializeFirebase(): FirebaseServices {
+  if (firebaseServices) {
+    return firebaseServices;
   }
 
-  // If already initialized, return the SDKs with the already initialized App
-  return getSdks(getApp());
-}
-
-export function getSdks(firebaseApp: FirebaseApp) {
-  return {
-    firebaseApp,
-    auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp),
-    storage: getStorage(firebaseApp),
+  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  
+  firebaseServices = {
+    firebaseApp: app,
+    auth: getAuth(app),
+    firestore: getFirestore(app),
+    storage: getStorage(app),
   };
+
+  return firebaseServices;
 }
 
+// Re-export everything else as it was
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';

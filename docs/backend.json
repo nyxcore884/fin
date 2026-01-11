@@ -4,16 +4,20 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "BudgetResult",
       "type": "object",
-      "description": "Represents the result of a budget analysis, including revenue, costs, and other financial metrics.",
+      "description": "Represents the final, processed output of a successful analysis run.",
       "properties": {
-        "id": {
+        "userId": {
           "type": "string",
-          "description": "Unique identifier for the Budget Result entry."
+          "description": "The Firebase Auth UID of the user who initiated the processing."
+        },
+        "uploadId": {
+          "type": "string",
+          "description": "Reference to the document in the 'uploads' collection."
         },
         "timestamp": {
           "type": "string",
-          "description": "Timestamp indicating when the budget result was generated.",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "Timestamp indicating when the processing was completed."
         },
         "retailRevenue": {
           "type": "number",
@@ -27,33 +31,40 @@
           "type": "number",
           "description": "Total costs for the period."
         },
-        "costsByBudgetHolder": {
-          "type": "array",
-          "description": "Array of cost breakdowns by budget holder.",
-          "items": {
-            "type": "string"
+        "costsByHolder": {
+          "type": "object",
+          "description": "A key-value map where the key is the budget holder and the value is the total cost.",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "costsByRegion": {
+          "type": "object",
+          "description": "A key-value map where the key is the region and the value is the total cost.",
+          "additionalProperties": {
+            "type": "number"
           }
         },
         "anomalies": {
           "type": "array",
-          "description": "Array of anomaly detections for the period.",
+          "description": "Array of AI-generated anomaly descriptions.",
           "items": {
             "type": "string"
           }
         },
-        "userId": {
+        "geminiPrompt": {
           "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N BudgetResult)"
+          "description": "Optional, for debugging. The exact prompt sent to Gemini for revenue classification."
         }
       },
       "required": [
-        "id",
+        "userId",
+        "uploadId",
         "timestamp",
         "retailRevenue",
         "wholesaleRevenue",
         "totalCosts",
-        "costsByBudgetHolder",
-        "userId"
+        "costsByHolder"
       ]
     },
     "UserProfile": {
@@ -62,65 +73,74 @@
       "type": "object",
       "description": "Represents a user profile within the application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User Profile entity."
-        },
         "email": {
           "type": "string",
           "description": "User's email address.",
           "format": "email"
         },
-        "displayName": {
-          "type": "string",
-          "description": "User's display name."
-        },
         "role": {
           "type": "string",
-          "description": "User's role (e.g., admin, viewer)."
+          "enum": ["admin", "viewer"],
+          "description": "User's role (admin or viewer)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the user was created."
         }
       },
       "required": [
-        "id",
         "email",
-        "displayName",
-        "role"
+        "role",
+        "createdAt"
       ]
     },
-    "FileUpload": {
+    "Upload": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FileUpload",
+      "title": "Upload",
       "type": "object",
-      "description": "Represents a file upload record.",
+      "description": "Represents a file upload record and its processing status.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the File Upload entity."
-        },
         "userId": {
           "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N FileUpload)"
+          "description": "The Firebase Auth UID of the user who uploaded the files."
         },
-        "filename": {
+        "timestamp": {
           "type": "string",
-          "description": "Name of the uploaded file."
+          "format": "date-time",
+          "description": "Timestamp of when the upload was initiated."
         },
-        "uploadTimestamp": {
-          "type": "string",
-          "description": "Timestamp of when the file was uploaded.",
-          "format": "date-time"
+        "files": {
+          "type": "object",
+          "description": "A map of filenames that were part of this upload.",
+          "properties": {
+            "glEntries": {"type": "string"},
+            "budgetHolderMapping": {"type": "string"},
+            "costItemMap": {"type": "string"},
+            "regionalMapping": {"type": "string"},
+            "corrections": {"type": "string"},
+            "revenueReport": {"type": "string"}
+          }
         },
-        "fileType": {
+        "status": {
           "type": "string",
-          "description": "Type of file uploaded (e.g., GL Entries, Budget Mapping)."
+          "enum": ["processing", "completed", "error"],
+          "description": "The processing status of the upload."
+        },
+        "errorMessage": {
+          "type": "string",
+          "description": "If status is 'error', this field contains the reason."
+        },
+        "resultId": {
+          "type": "string",
+          "description": "The ID of the corresponding document in the budget_results collection."
         }
       },
       "required": [
-        "id",
         "userId",
-        "filename",
-        "uploadTimestamp",
-        "fileType"
+        "timestamp",
+        "files",
+        "status"
       ]
     }
   },
@@ -137,74 +157,32 @@
         "definition": {
           "entityName": "UserProfile",
           "schema": {
-            "$ref": "#/backend/entities/UserProfile"
+            "$ref": "#/entities/UserProfile"
           },
-          "description": "Stores user profile information. The 'userId' parameter identifies the user. This path enables path-based ownership for private user data.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
+          "description": "Stores user profile information, with the document ID matching the user's Firebase Auth UID."
         }
       },
       {
-        "path": "/users/{userId}/budget_results/{budgetResultId}",
+        "path": "/uploads/{uploadId}",
+        "definition": {
+          "entityName": "Upload",
+          "schema": {
+            "$ref": "#/entities/Upload"
+          },
+          "description": "A log of every file upload attempt, tracking its status and associated files."
+        }
+      },
+      {
+        "path": "/budget_results/{resultId}",
         "definition": {
           "entityName": "BudgetResult",
           "schema": {
-            "$ref": "#/backend/entities/BudgetResult"
+            "$ref": "#/entities/BudgetResult"
           },
-          "description": "Stores budget result data for a specific user. Includes denormalized 'userId' for authorization independence, allowing direct validation of ownership within security rules without 'get()' calls. 'budgetResultId' is the unique ID for the budget result. This enables secure listing of results specific to a user.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "budgetResultId",
-              "description": "The unique identifier for the budget result."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/file_uploads/{fileUploadId}",
-        "definition": {
-          "entityName": "FileUpload",
-          "schema": {
-            "$ref": "#/backend/entities/FileUpload"
-          },
-          "description": "Stores file upload metadata for a specific user. Includes denormalized 'userId' for authorization independence. 'fileUploadId' is the unique ID for the file upload. This enables secure listing of file uploads specific to a user.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "fileUploadId",
-              "description": "The unique identifier for the file upload."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/roles_admin/{userId}",
-        "definition": {
-          "entityName": "role",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Collection to manage admin roles. The existence of a document with a user ID implies admin privileges. Existence over Content, to prevent data modification.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
+          "description": "Stores the final, processed output of a successful analysis run."
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the Budget Insights application. User profiles and budget results are stored in separate collections. File uploads are linked to users and timestamped. Authorization independence is achieved by storing the 'userId' within each `BudgetResult` and `FileUpload` document, eliminating the need for `get()` calls in security rules to verify ownership. This allows for atomic operations (transactions/batches) without hierarchical dependencies. The structure supports QAPs by segregating data based on ownership and role, allowing for secure `list` operations using path-based rules. The `roles_admin` collection enables global role-based access control."
+    "reasoning": "The Firestore structure is designed to decouple upload jobs from their results. The 'uploads' collection acts as a job queue and log, while 'budget_results' stores the immutable outcomes. This separation allows the UI to easily track the status of an ongoing process by listening to the 'uploads' document and then fetch the final data from 'budget_results' upon completion. The 'users' collection manages roles for role-based access control as defined in the security rules."
   }
 }

@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { FileInput } from './file-input';
 import { Button } from '../ui/button';
 import { Sparkles, Wand, Loader } from 'lucide-react';
-import { useUploadFile, createUploadSession, markSessionAsReady } from '@/lib/storage';
+import { useUploadFile } from '@/lib/storage';
 import { MOCK_UPLOAD_FILES } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -33,9 +33,9 @@ export function UploadArea() {
     }, {} as Record<string, FileState>)
   );
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDone, setIsDone] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const { user } = useUser();
-  const { uploadFile, updateSessionFiles } = useUploadFile();
+  const { uploadFile, createUploadSession, updateSessionFiles, markSessionAsReady } = useUploadFile();
   const { toast } = useToast();
 
   const handleFileChange = (id: string, file: File | null) => {
@@ -63,8 +63,7 @@ export function UploadArea() {
     }
 
     setIsProcessing(true);
-    setIsDone(false);
-    const sessionId = uuidv4();
+    const newSessionId = uuidv4();
 
     const filesToUpload = Object.entries(filesState)
       .filter(([, state]) => state.uploadState === 'selected' && state.file)
@@ -78,20 +77,20 @@ export function UploadArea() {
 
     try {
       // 1. Create the session document in Firestore
-      await createUploadSession(user.uid, sessionId);
-      toast({ title: "Upload Session Created", description: `Session ID: ${sessionId}` });
+      await createUploadSession(user.uid, newSessionId);
+      toast({ title: "Upload Session Created", description: `Session ID: ${newSessionId}` });
 
       // 2. Upload all files in parallel
       const uploadPromises = filesToUpload.map(({ id, file }) => {
         setFilesState(prev => ({ ...prev, [id]: { ...prev[id], uploadState: 'loading', progress: 0 } }));
-        const storagePath = `user_uploads/${user.uid}/${sessionId}/${id}/${file.name}`;
+        const storagePath = `user_uploads/${user.uid}/${newSessionId}/${id}/${file.name}`;
         
         return uploadFile(storagePath, file, (progress) => {
           setFilesState(prev => ({ ...prev, [id]: { ...prev[id], progress } }));
-        }).then(async (downloadURL) => {
+        }).then(async () => {
           setFilesState(prev => ({ ...prev, [id]: { ...prev[id], uploadState: 'success' } }));
           // Update the session doc with this file's info
-          await updateSessionFiles(sessionId, id, file.name, storagePath);
+          await updateSessionFiles(newSessionId, id, file.name, storagePath);
           return { id, status: 'success' };
         }).catch((error) => {
           console.error(`Upload failed for ${id}:`, error);
@@ -107,13 +106,13 @@ export function UploadArea() {
       }
 
       // 3. Mark the session as ready for processing
-      await markSessionAsReady(sessionId);
+      await markSessionAsReady(newSessionId);
 
       toast({
           title: 'Upload Complete & Processing Started',
           description: 'The backend is now processing your files. Check the dashboard for status updates.',
       });
-      setIsDone(true);
+      setSessionId(newSessionId);
 
     } catch (error: any) {
        toast({
@@ -130,13 +129,14 @@ export function UploadArea() {
     .filter(f => f.required)
     .every(f => filesState[f.id].file !== null);
 
-  if (isDone) {
+  if (sessionId) {
     return (
         <Alert>
             <Terminal className="h-4 w-4" />
             <AlertTitle>Processing Initiated!</AlertTitle>
             <AlertDescription>
                 Your files have been securely uploaded. The backend process has been triggered, and you can monitor the status on your dashboard.
+                <div className="mt-2 text-xs text-muted-foreground">Session ID: {sessionId}</div>
             </AlertDescription>
         </Alert>
     )

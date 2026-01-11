@@ -8,8 +8,7 @@ import {
 import { useStorage, useFirestore } from '@/firebase/provider';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-export const createUploadSession = async (userId: string, sessionId: string) => {
-    const firestore = useFirestore();
+export const createUploadSession = async (firestore: any, userId: string, sessionId: string) => {
     const sessionRef = doc(firestore, 'upload_sessions', sessionId);
     await setDoc(sessionRef, {
         userId,
@@ -20,8 +19,7 @@ export const createUploadSession = async (userId: string, sessionId: string) => 
     });
 };
 
-export const markSessionAsReady = async (sessionId: string) => {
-    const firestore = useFirestore();
+export const markSessionAsReady = async (firestore: any, sessionId:string) => {
     const sessionRef = doc(firestore, 'upload_sessions', sessionId);
     await updateDoc(sessionRef, {
         status: 'ready_for_processing',
@@ -39,6 +37,10 @@ export const useUploadFile = () => {
     onProgress?: (progress: number) => void
   ): Promise<string> => {
 
+    if (!storage) {
+        return Promise.reject(new Error("Firebase Storage is not available."));
+    }
+      
     try {
       const fileRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(fileRef, file);
@@ -68,6 +70,9 @@ export const useUploadFile = () => {
   };
 
   const updateSessionFiles = async (sessionId: string, fileType: string, fileName: string, storagePath: string) => {
+    if (!firestore) {
+        throw new Error("Firestore is not available.");
+    }
     const sessionRef = doc(firestore, 'upload_sessions', sessionId);
     await updateDoc(sessionRef, {
         [`files.${fileType}`]: {
@@ -78,5 +83,5 @@ export const useUploadFile = () => {
     });
   };
 
-  return { uploadFile, updateSessionFiles };
+  return { uploadFile, updateSessionFiles, createUploadSession: (userId: string, sessionId: string) => createUploadSession(firestore, userId, sessionId), markSessionAsReady: (sessionId: string) => markSessionAsReady(firestore, sessionId) };
 };

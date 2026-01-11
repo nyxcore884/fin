@@ -8,9 +8,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // This is required to allow the Next.js dev server to accept requests from the
+  // Google Cloud Workstations environment.
   experimental: {
-    // This is required to allow the Next.js dev server to accept requests from the
-    // Google Cloud Workstations environment.
     allowedDevOrigins: ["*.cloudworkstations.dev"],
   },
   images: {

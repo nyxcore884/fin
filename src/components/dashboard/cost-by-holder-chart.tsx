@@ -24,7 +24,7 @@ export function CostByHolderChart() {
         <CardDescription>Latest Quarter</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={MOCK_COST_CHART_CONFIG} className="h-[300px] w-full">
+        <ChartContainer id="cost-by-holder" config={MOCK_COST_CHART_CONFIG} className="h-[300px] w-full">
           <BarChart
             accessibilityLayer
             data={MOCK_COST_DATA}

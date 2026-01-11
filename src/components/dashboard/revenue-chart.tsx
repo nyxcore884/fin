@@ -26,6 +26,7 @@ export function RevenueChart() {
       </CardHeader>
       <CardContent className="pb-0">
         <ChartContainer
+          id="revenue-breakdown"
           config={MOCK_REVENUE_CHART_CONFIG}
           className="mx-auto aspect-square max-h-[250px]"
         >

@@ -1,10 +1,46 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/icons/logo';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChromeIcon } from 'lucide-react';
-import Link from 'next/link';
+import { ChromeIcon, Loader } from 'lucide-react';
+import { useAuth } from '@/firebase';
+import { GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { useUser } from '@/firebase/provider';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function LoginPage() {
+  const auth = useAuth();
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, isUserLoading, router]);
+
+
+  const handleGoogleSignIn = async () => {
+    if (!auth) return;
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithRedirect(auth, provider);
+    } catch (error) {
+      console.error("Error during Google sign-in:", error);
+      // Optionally, show a toast notification to the user
+    }
+  };
+  
+  if (isUserLoading || user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Loader className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-sm">
@@ -17,14 +53,12 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            <Button asChild size="lg" className="w-full transition-all hover:shadow-glow-primary">
-              <Link href="/dashboard">
-                <ChromeIcon className="mr-2 h-5 w-5" />
-                Sign in with Google
-              </Link>
+            <Button onClick={handleGoogleSignIn} size="lg" className="w-full transition-all hover:shadow-glow-primary">
+              <ChromeIcon className="mr-2 h-5 w-5" />
+              Sign in with Google
             </Button>
             <p className="px-8 text-center text-xs text-muted-foreground">
-              By continuing, you agree to our Terms of Service and Privacy Policy. This is a demo app; authentication is simulated.
+              By continuing, you agree to our Terms of Service and Privacy Policy.
             </p>
           </div>
         </CardContent>

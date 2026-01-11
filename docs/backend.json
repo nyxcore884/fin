@@ -1,7 +1,6 @@
 {
   "entities": {
     "BudgetResult": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "BudgetResult",
       "type": "object",
       "description": "Represents the final, processed output of a successful analysis run.",
@@ -68,7 +67,6 @@
       ]
     },
     "UserProfile": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserProfile",
       "type": "object",
       "description": "Represents a user profile within the application.",
@@ -80,7 +78,10 @@
         },
         "role": {
           "type": "string",
-          "enum": ["admin", "viewer"],
+          "enum": [
+            "admin",
+            "viewer"
+          ],
           "description": "User's role (admin or viewer)."
         },
         "createdAt": {
@@ -96,7 +97,6 @@
       ]
     },
     "Upload": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Upload",
       "type": "object",
       "description": "Represents a file upload record and its processing status.",
@@ -114,17 +114,33 @@
           "type": "object",
           "description": "A map of filenames that were part of this upload.",
           "properties": {
-            "glEntries": {"type": "string"},
-            "budgetHolderMapping": {"type": "string"},
-            "costItemMap": {"type": "string"},
-            "regionalMapping": {"type": "string"},
-            "corrections": {"type": "string"},
-            "revenueReport": {"type": "string"}
+            "glEntries": {
+              "type": "string"
+            },
+            "budgetHolderMapping": {
+              "type": "string"
+            },
+            "costItemMap": {
+              "type": "string"
+            },
+            "regionalMapping": {
+              "type": "string"
+            },
+            "corrections": {
+              "type": "string"
+            },
+            "revenueReport": {
+              "type": "string"
+            }
           }
         },
         "status": {
           "type": "string",
-          "enum": ["processing", "completed", "error"],
+          "enum": [
+            "processing",
+            "completed",
+            "error"
+          ],
           "description": "The processing status of the upload."
         },
         "errorMessage": {
@@ -146,8 +162,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "google.com"
     ]
   },
   "firestore": {
@@ -155,7 +170,6 @@
       {
         "path": "/users/{userId}",
         "definition": {
-          "entityName": "UserProfile",
           "schema": {
             "$ref": "#/entities/UserProfile"
           },
@@ -165,7 +179,6 @@
       {
         "path": "/uploads/{uploadId}",
         "definition": {
-          "entityName": "Upload",
           "schema": {
             "$ref": "#/entities/Upload"
           },
@@ -175,14 +188,12 @@
       {
         "path": "/budget_results/{resultId}",
         "definition": {
-          "entityName": "BudgetResult",
           "schema": {
             "$ref": "#/entities/BudgetResult"
           },
           "description": "Stores the final, processed output of a successful analysis run."
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to decouple upload jobs from their results. The 'uploads' collection acts as a job queue and log, while 'budget_results' stores the immutable outcomes. This separation allows the UI to easily track the status of an ongoing process by listening to the 'uploads' document and then fetch the final data from 'budget_results' upon completion. The 'users' collection manages roles for role-based access control as defined in the security rules."
+    ]
   }
 }

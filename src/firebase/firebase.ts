@@ -46,7 +46,7 @@ const initializeFirebaseServices = () => {
 /**
  * The main provider component. It initializes Firebase and makes services and user state available to its children.
  */
-export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   // Memoize the Firebase services to prevent re-initialization on re-renders.
   const firebaseServices = useMemo(initializeFirebaseServices, []);
   

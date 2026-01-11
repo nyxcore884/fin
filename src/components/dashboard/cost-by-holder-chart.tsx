@@ -50,8 +50,8 @@ export function CostByHolderChart() {
               content={<ChartTooltipContent indicator="line" />}
             />
             <Bar dataKey="costs" radius={4}>
-              {MOCK_COST_DATA.map((entry) => (
-                <Cell key={entry.budgetHolder} fill={entry.fill} />
+              {MOCK_COST_DATA.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${index + 1}))`} />
               ))}
             </Bar>
           </BarChart>

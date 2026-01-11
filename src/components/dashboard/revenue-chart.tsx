@@ -40,7 +40,7 @@ export function RevenueChart() {
               nameKey="type"
               innerRadius={60}
               strokeWidth={5}
-              stroke="hsl(var(--background))"
+              stroke="hsl(var(--card))"
             >
                {MOCK_REVENUE_DATA.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />

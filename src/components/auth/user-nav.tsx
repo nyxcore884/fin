@@ -13,6 +13,7 @@ import { LogOut, User, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { MOCK_USER } from '@/lib/data';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 
 export function UserNav() {
   const userAvatar = PlaceHolderImages.find(img => img.id === 'user-avatar-1');
@@ -51,6 +52,10 @@ export function UserNav() {
             <span>Upgrade</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <div className='p-1'>
+            <ThemeToggle />
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/login">

@@ -79,7 +79,8 @@ export function ConfigurationUpload({ onUploadComplete }: ConfigurationUploadPro
     setProgress(0);
     const newSessionId = uuidv4();
 
-    const filesToUpload = fileTypes.map(ft => ({ id: ft.id, file: selectedFiles[ft.id], label: ft.label }))
+    const filesToUpload = Object.entries(selectedFiles)
+      .map(([id, file]) => ({ id, file, label: fileTypes.find(ft => ft.id === id)?.label || id }))
       .filter(f => f.file);
 
     if (filesToUpload.length === 0) {

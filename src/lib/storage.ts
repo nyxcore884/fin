@@ -6,7 +6,7 @@ import {
   getDownloadURL,
   getStorage,
 } from 'firebase/storage';
-import { getFirestore, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
 
@@ -32,9 +32,10 @@ export const createUploadSession = async (userId: string, sessionId: string) => 
     });
 };
 
-export const markSessionAsReady = async (sessionId:string) => {
+export const markSessionAsReady = async (sessionId: string, data: Record<string, any>) => {
     const sessionRef = doc(firestore, 'upload_sessions', sessionId);
     await updateDoc(sessionRef, {
+        ...data,
         status: 'ready_for_processing',
         readyAt: serverTimestamp()
     });

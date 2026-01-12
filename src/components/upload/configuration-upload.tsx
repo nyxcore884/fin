@@ -6,8 +6,6 @@ import { Button } from '../ui/button';
 import { Sparkles, Wand, Loader, FileCheck, UploadCloud } from 'lucide-react';
 import { useUploadFile } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Terminal } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 const fileTypes = [
@@ -114,7 +112,7 @@ export function ConfigurationUpload({ onUploadComplete }: ConfigurationUploadPro
       }
       
       setActiveFile('Finalizing...');
-      await markSessionAsReady(newSessionId, uploadedFiles, 'configuration');
+      await markSessionAsReady(newSessionId, { files: uploadedFiles, mode: 'configuration' });
 
       onUploadComplete(newSessionId);
 
@@ -132,32 +130,28 @@ export function ConfigurationUpload({ onUploadComplete }: ConfigurationUploadPro
   
   if (isProcessing) {
     return (
-        <Alert className="bg-gradient-primary-accent">
-            <Terminal className="h-4 w-4" />
-            <AlertTitle>Processing Configuration...</AlertTitle>
-            <AlertDescription>
-                Your files are being securely uploaded. The backend will process them shortly.
-            </AlertDescription>
+        <div className="space-y-4 rounded-lg border bg-card/80 p-6">
+            <h3 className="text-lg font-medium text-center">Saving Configuration...</h3>
             <div className="w-full space-y-2 mt-4">
                 <Progress value={progress} className="h-2 w-full bg-accent/20" />
                 {activeFile && (
-                    <p className="text-sm text-muted-foreground">Uploading: <strong>{activeFile}</strong></p>
+                    <p className="text-sm text-muted-foreground text-center">Uploading: <strong>{activeFile}</strong></p>
                 )}
             </div>
-        </Alert>
+        </div>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 rounded-lg border bg-card/80 p-6">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {fileTypes.map((fileType) => (
-            <div key={fileType.id} className="rounded-lg border bg-card/80 p-4 text-card-foreground shadow-sm backdrop-blur-sm">
+            <div key={fileType.id} >
                 <label className="block text-sm font-medium mb-1">
                 {fileType.label}
                 {fileType.required && <span className="text-destructive ml-1">*</span>}
                 </label>
-                <p className="text-xs text-muted-foreground mb-3">
+                <p className="text-xs text-muted-foreground mb-3 h-8">
                 {fileType.description}
                 </p>
                 {selectedFiles[fileType.id] ? (

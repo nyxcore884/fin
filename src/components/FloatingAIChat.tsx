@@ -3,14 +3,18 @@
 import { useState } from 'react';
 import AIChat from './AIChat';
 
-export default function FloatingAIChat() {
+interface FloatingAIChatProps {
+  currentSessionId?: string;
+}
+
+export default function FloatingAIChat({ currentSessionId }: FloatingAIChatProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {isOpen && (
-        <div className="absolute bottom-16 right-0 w-96 h-96 bg-background border border-primary rounded-lg shadow-lg">
-          <AIChat onClose={() => setIsOpen(false)} />
+        <div className="absolute bottom-16 right-0 w-96 h-[32rem] bg-background border border-primary rounded-lg shadow-lg">
+          <AIChat onClose={() => setIsOpen(false)} currentSessionId={currentSessionId} />
         </div>
       )}
       <button

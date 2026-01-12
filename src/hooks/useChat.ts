@@ -1,28 +1,41 @@
 'use client';
 
 import { useState } from 'react';
-import { sendMessageToGemini } from '@/lib/gemini';
+import { provideAnomalySuggestions } from '@/ai/flows/provide-anomaly-suggestions';
 import { Message } from '@/types/chat';
 
-export function useChat() {
+type UseChatProps = {
+    currentSessionId?: string;
+};
+
+export function useChat({ currentSessionId }: UseChatProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [inputMessage, setInputMessage] = useState('');
 
   const sendMessage = async (content: string) => {
+    if (!content.trim()) return;
+
     setIsLoading(true);
     
-    // Add user message
     const userMessage: Message = { role: 'user', content };
     setMessages(prev => [...prev, userMessage]);
     
     try {
-      // Get response from Gemini
-      const response = await sendMessageToGemini(content);
-      const assistantMessage: Message = { role: 'assistant', content: response };
+      // In a real app with auth, you'd get the real user ID.
+      const userId = 'anonymous_user'; 
+
+      const result = await provideAnomalySuggestions({
+        message: content,
+        userId: userId,
+        sessionId: currentSessionId,
+      });
       
+      const assistantMessage: Message = { role: 'assistant', content: result.response };
       setMessages(prev => [...prev, assistantMessage]);
+
     } catch (error) {
-      console.error('Error sending message to Gemini:', error);
+      console.error('Error calling AI assistant:', error);
       const errorMessage: Message = { 
         role: 'assistant', 
         content: 'Sorry, I encountered an error. Please try again.' 
@@ -33,5 +46,5 @@ export function useChat() {
     }
   };
 
-  return { messages, sendMessage, isLoading };
+  return { messages, sendMessage, isLoading, inputMessage, setInputMessage };
 }

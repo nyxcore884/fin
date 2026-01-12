@@ -1,20 +1,37 @@
 'use client';
 
+import { useState } from 'react';
 import { useChat } from '@/hooks/useChat';
 import MessageList from './MessageList';
-import MessageInput from './MessageInput';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 interface AIChatProps {
   onClose: () => void;
+  currentSessionId?: string;
 }
 
-export default function AIChat({ onClose }: AIChatProps) {
-  const { messages, sendMessage, isLoading } = useChat();
+export default function AIChat({ onClose, currentSessionId }: AIChatProps) {
+  const { messages, sendMessage, isLoading, setInputMessage } = useChat({ currentSessionId });
+  const [localMessage, setLocalMessage] = useState('');
+
+  const handleSendMessage = () => {
+    if (localMessage.trim()) {
+      sendMessage(localMessage);
+      setLocalMessage('');
+    }
+  };
+
+  const handleQuickAction = (text: string) => {
+    setLocalMessage(text);
+    sendMessage(text);
+    setLocalMessage('');
+  };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background border border-primary rounded-lg">
       <div className="flex items-center justify-between p-4 border-b border-primary">
-        <h3 className="text-lg font-semibold text-foreground">AI Assistant</h3>
+        <h3 className="text-lg font-semibold text-foreground">AI Financial Assistant</h3>
         <button
           onClick={onClose}
           className="text-muted-foreground hover:text-foreground"
@@ -24,8 +41,32 @@ export default function AIChat({ onClose }: AIChatProps) {
           </svg>
         </button>
       </div>
-      <MessageList messages={messages} />
-      <MessageInput onSendMessage={sendMessage} isLoading={isLoading} />
+      <MessageList messages={messages} isLoading={isLoading} />
+      <div className="p-4 border-t border-border">
+        <div className="flex space-x-2">
+          <Input
+            type="text"
+            value={localMessage}
+            onChange={(e) => setLocalMessage(e.target.value)}
+            placeholder="Ask about your financial data..."
+            className="flex-1"
+            disabled={isLoading}
+            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+          />
+          <Button
+            onClick={handleSendMessage}
+            disabled={!localMessage.trim() || isLoading}
+          >
+            Send
+          </Button>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleQuickAction("What are the main cost drivers in my latest report?")}>Cost Analysis</Button>
+          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleQuickAction("Show me revenue trends across my reports")}>Revenue Trends</Button>
+          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleQuickAction("What anomalies were detected in my data?")}>Anomalies</Button>
+          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleQuickAction("Give me recommendations for cost optimization")}>Recommendations</Button>
+        </div>
+      </div>
     </div>
   );
 }

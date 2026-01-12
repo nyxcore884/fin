@@ -1,24 +1,30 @@
 'use server';
 
 import * as admin from 'firebase-admin';
-import { onDocumentUpdate } from '@genkit-ai/firebase/functions';
+import { onDocumentUpdate } from 'firebase-functions/v2/firestore';
+import { onFlow } from '@genkit-ai/firebase/functions';
 import { ai } from '@/ai/genkit';
 import { processUploadedFiles } from '../processors/dataProcessor';
 import { analyzeWithAI } from '../processors/aiProcessor';
+import { verifyFirebaseConfig } from '../processors/verifyConfig';
+
+// Verify configuration on function load
+try {
+  verifyFirebaseConfig();
+  console.log('✅ Configuration verified successfully');
+} catch (error: any) {
+  console.error('❌ Configuration error:', error.message);
+}
+
 
 // Initialize Firebase Admin SDK if not already initialized
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 
-export const processBudgetData = ai.defineFlow(
+const processBudgetDataFlow = ai.defineFlow(
     {
-        name: 'processBudgetData',
-        triggers: [
-            onDocumentUpdate(
-                'upload_sessions/{sessionId}',
-            ),
-        ],
+        name: 'processBudgetDataFlow',
     },
     async (change) => {
         if (!change) {
@@ -88,4 +94,12 @@ export const processBudgetData = ai.defineFlow(
             }
         }
     }
+);
+
+export const processBudgetData = onFlow(
+    {
+        name: 'processBudgetData',
+        trigger: onDocumentUpdate('upload_sessions/{sessionId}'),
+        flow: processBudgetDataFlow
+    },
 );

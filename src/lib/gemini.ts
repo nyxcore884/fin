@@ -7,10 +7,10 @@ import { ai } from '@/ai/genkit';
 
 export async function sendMessageToGemini(message: string): Promise<string> {
   try {
-    const { text } = await ai.generate({
+    const response = await ai.generate({
       prompt: message,
     });
-    return text;
+    return response.text;
   } catch (error) {
     console.error('Error calling Gemini API via Genkit:', error);
     throw new Error('Failed to get response from AI');

@@ -1,3 +1,5 @@
+'use client';
+
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
@@ -10,7 +12,9 @@ export function Header() {
       <div className="flex-1">
         {/* Placeholder for breadcrumbs or page title if needed */}
       </div>
-      <ThemeToggle />
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

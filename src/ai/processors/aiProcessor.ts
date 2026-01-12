@@ -1,68 +1,79 @@
-import { ai } from '@/ai/genkit';
-import { classifyRevenue } from '../flows/classify-revenue';
-import { detectAnomalies } from '../flows/detect-anomalies';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Initialize Google Generative AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export interface AIAnalysis {
-  retailRevenue: number;
-  wholesaleRevenue: number;
-  anomalies: any[]; // Array of anomaly objects from the flow
+  revenueClassification: { retail: number; wholesale: number };
+  anomalies: string[];
+  insights: string[];
+  recommendations: string[];
 }
 
 export const analyzeWithAI = async (data: any): Promise<AIAnalysis> => {
-  let retailRevenue = 0;
-  let wholesaleRevenue = 0;
-  
-  // 1. Classify Revenue
-  // In a real scenario, you'd provide better keywords or a more robust system.
-  const keywordsRetail = 'Online, POS, Direct Sale';
-  const keywordsWholesale = 'Bulk, Distributor, Reseller';
-
-  for (const entry of data.rawDataForAI) {
-      // Basic logic to identify revenue entries (e.g., positive amount, not in cost map)
-      const amount = parseFloat(entry.Amount_Reporting_Curr || '0');
-      if (amount > 0) { 
-        try {
-            const classificationResult = await classifyRevenue({
-                revenueEntry: entry['Text'] || JSON.stringify(entry),
-                keywordsRetail,
-                keywordsWholesale,
-            });
-
-            if (classificationResult.classification === 'retail') {
-                retailRevenue += amount;
-            } else {
-                wholesaleRevenue += amount;
-            }
-        } catch (e) {
-            console.error("Revenue classification failed for an entry, adding to retail by default.", e);
-            retailRevenue += amount;
-        }
-      }
-  }
-
-  // 2. Detect Anomalies
-  let anomalies: any[] = [];
   try {
-      const anomalyResult = await detectAnomalies({
-          incomeStatementData: JSON.stringify({
-              totalCosts: data.totalCosts,
-              costsByHolder: data.costsByHolder,
-              costsByRegion: data.costsByRegion,
-              transactionCount: data.transactionCount,
-              retailRevenue: retailRevenue,
-              wholesaleRevenue: wholesaleRevenue
-          })
-      });
-      anomalies = anomalyResult.anomalies;
-  } catch(e) {
-      console.error("Anomaly detection failed.", e);
-      anomalies = [{ metric: 'AI System', description: 'Anomaly detection failed to run.', severity: 'high' }];
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-pro',
+      generationConfig: {
+        maxOutputTokens: 2048,
+        temperature: 0.3,
+      },
+    });
+
+    const prompt = `
+As a senior financial analyst for a gas distribution company, analyze the following budget data:
+
+BUDGET OVERVIEW:
+- Total Costs: $${data.totalCosts.toLocaleString()}
+- Retail Revenue: $${data.retailRevenue.toLocaleString()}
+- Wholesale Revenue: $${data.wholesaleRevenue.toLocaleString()}
+- Transaction Count: ${data.transactionCount}
+
+COST BREAKDOWN BY DEPARTMENT:
+${Object.entries(data.costsByHolder).map(([dept, amount]) => `  - ${dept}: $${Number(amount).toLocaleString()}`).join('\n')}
+
+COST BREAKDOWN BY REGION:
+${Object.entries(data.costsByRegion).map(([region, amount]) => `  - ${region}: $${Number(amount).toLocaleString()}`).join('\n')}
+
+Please provide:
+1. REVENUE CLASSIFICATION: Accurate breakdown of retail vs wholesale revenue
+2. ANOMALIES: 3-5 most significant anomalies or unusual patterns with potential causes
+3. INSIGHTS: 3-5 key insights for executive management
+4. RECOMMENDATIONS: 3 actionable recommendations for cost optimization
+
+Format the response as valid JSON with this structure:
+{
+  "revenueClassification": {"retail": number, "wholesale": number},
+  "anomalies": string[],
+  "insights": string[],
+  "recommendations": string[]
+}
+`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    
+    // Parse the AI response
+    const textResponse = response.text();
+    
+    // Clean the response (remove markdown code blocks if present)
+    const cleanResponse = textResponse.replace(/```json\n?|\n?```/g, '');
+    
+    const aiAnalysis: AIAnalysis = JSON.parse(cleanResponse);
+    return aiAnalysis;
+
+  } catch (error) {
+    console.error("AI analysis failed:", error);
+    
+    // Return default analysis if AI fails
+    return {
+      revenueClassification: {
+        retail: data.retailRevenue || 0,
+        wholesale: data.wholesaleRevenue || 0
+      },
+      anomalies: ["AI analysis temporarily unavailable. Please review data manually."],
+      insights: ["Initial data processing completed successfully. AI analysis pending."],
+      recommendations: ["Please verify the data quality and try AI analysis again."]
+    };
   }
-
-
-  return {
-    retailRevenue,
-    wholesaleRevenue,
-    anomalies
-  };
 };

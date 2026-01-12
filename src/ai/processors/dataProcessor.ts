@@ -1,5 +1,5 @@
 import { Storage } from '@google-cloud/storage';
-import * as csv from 'csv-parser';
+import csv from 'csv-parser';
 import * as XLSX from 'xlsx';
 import { createReadStream } from 'fs';
 import { tmpdir } from 'os';

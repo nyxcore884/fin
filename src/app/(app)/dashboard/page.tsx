@@ -1,47 +1,10 @@
 'use server';
 
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, App } from 'firebase-admin/app';
 import { DashboardClient } from '@/components/dashboard/dashboard-client';
 
-// Initialize Firebase Admin SDK
-let adminApp: App;
-if (!getApps().length) {
-  adminApp = initializeApp();
-} else {
-  adminApp = getApps()[0]!;
-}
-const db = getFirestore(adminApp);
-
-
-async function getDashboardData() {
-  // Fetch the last 10 reports for the table
-  const reportsQuery = query(
-    collection(db, 'budget_results'),
-    orderBy('timestamp', 'desc'),
-    limit(10)
-  );
-
-  const reportsSnapshot = await getDocs(reportsQuery);
-  const reports = reportsSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      name: `Report ${data.sessionId?.slice(0, 8) || 'N/A'}`,
-      date: new Date(data.timestamp._seconds * 1000).toLocaleDateString(),
-      status: 'Completed', // Assuming all results are completed
-    };
-  });
-  
-  const latestReport = reportsSnapshot.docs.length > 0 ? reportsSnapshot.docs[0].data() : null;
-
-  return { reports, latestReport };
-}
-
 export default async function DashboardPage() {
-  const { reports, latestReport } = await getDashboardData();
-  
+  // All data fetching is now handled on the client-side in DashboardClient
+  // to resolve server-side authentication issues.
   return (
     <div className="flex flex-col gap-8">
       <div className="flex justify-between items-center">
@@ -53,7 +16,7 @@ export default async function DashboardPage() {
         </div>
       </div>
       
-      <DashboardClient reports={reports} latestReport={latestReport} />
+      <DashboardClient />
 
     </div>
   );

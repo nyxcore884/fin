@@ -118,6 +118,13 @@ export function ConfigurationUpload({ onUploadComplete }: ConfigurationUploadPro
         files: uploadedFiles,
         mode: 'configuration'
       });
+      
+      // Directly trigger backend processing via API route
+      await fetch('/api/process-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: newSessionId }),
+      });
 
       onUploadComplete(newSessionId);
 

@@ -61,6 +61,13 @@ export function OperationalUpload({ onUploadComplete }: OperationalUploadProps) 
         mode: 'operational'
       });
 
+      // Directly trigger backend processing via API route
+      await fetch('/api/process-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+
       onUploadComplete(sessionId);
 
     } catch (error: any) {

@@ -112,7 +112,10 @@ export function ConfigurationUpload({ onUploadComplete }: ConfigurationUploadPro
       }
       
       setActiveFile('Finalizing...');
-      await markSessionAsReady(newSessionId, uploadedFiles);
+      await markSessionAsReady(newSessionId, {
+        files: uploadedFiles,
+        mode: 'configuration'
+      });
 
       onUploadComplete(newSessionId);
 

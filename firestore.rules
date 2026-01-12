@@ -6,17 +6,14 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Allow create/update/read on upload sessions without auth, as the app is currently auth-less
+    // Allow create/update/read on upload sessions without auth
     match /upload_sessions/{sessionId} {
       allow read, create, update: if true;
     }
 
-    // Admins can read all results. Users can read their own results.
-    // Cloud Functions can create results.
+    // Allow all operations on budget_results without auth for now
     match /budget_results/{resultId} {
-      allow create: if request.auth == null; // Allow from Cloud Functions
-      allow read, delete: if true; // Allow reads for now without auth
-      allow list: if true; // Allow lists for now without auth
+      allow read, create, update, delete, list: if true;
     }
 
     // Backups can only be created by Cloud Functions and read by admins
@@ -27,8 +24,7 @@ service cloud.firestore {
     
     // Users can create their own feedback. Admins can read all feedback.
     match /feedback/{feedbackId} {
-      allow create: if true; // Allow feedback creation without auth
-      allow read, update: if true; // Allow read/update for now without auth
+      allow create, read, update: if true;
     }
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -91,7 +91,7 @@ export default function ReportsPage() {
     });
 
     return () => unsubscribe();
-  }, [timeRange]);
+  }, [timeRange, selectedReport]);
 
   const aggregateMetrics = reports.reduce((acc, report) => {
     const metrics = report.verifiedMetrics || {};

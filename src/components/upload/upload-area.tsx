@@ -119,9 +119,14 @@ export function UploadArea({ onUploadComplete }: UploadAreaProps) {
       });
 
       onUploadComplete(newSessionId); // Notify parent component
-      // Reset form state for next upload
-      setSessionId(null);
-      setSelectedFiles(Object.fromEntries(fileTypes.map(f => [f.id, null])));
+      
+      // Reset form for next upload after a short delay to show completion
+      setTimeout(() => {
+        setSessionId(null);
+        setSelectedFiles(Object.fromEntries(fileTypes.map(f => [f.id, null])));
+        setIsProcessing(false);
+        setProgress(0);
+      }, 1000);
 
 
     } catch (error: any) {
@@ -130,16 +135,15 @@ export function UploadArea({ onUploadComplete }: UploadAreaProps) {
         title: 'Processing Failed',
         description: error.message || 'An unexpected error occurred.',
       });
-    } finally {
-        setIsProcessing(false);
+      setIsProcessing(false); // Re-enable on failure
     }
   };
 
   const canUpload = fileTypes.filter(ft => ft.required).every(ft => selectedFiles[ft.id]);
-
+  
   if (sessionId && isProcessing) {
     return (
-        <Alert>
+        <Alert className="bg-gradient-primary-accent">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Processing Initiated!</AlertTitle>
             <AlertDescription>
@@ -170,7 +174,7 @@ export function UploadArea({ onUploadComplete }: UploadAreaProps) {
                 {selectedFiles[fileType.id] ? (
                     <div className="flex items-center justify-between text-sm text-green-400 border border-green-400/30 bg-green-950/50 rounded-md px-3 py-2">
                         <span className="truncate flex items-center gap-2"><FileCheck className="h-4 w-4"/> {selectedFiles[fileType.id]?.name}</span>
-                        <button onClick={() => handleFileChange(fileType.id, null)} className="text-muted-foreground hover:text-destructive">x</button>
+                        <button onClick={() => handleFileChange(fileType.id, null)} className="text-muted-foreground hover:text-destructive text-lg leading-none">&times;</button>
                     </div>
                 ) : (
                     <div className="flex items-center space-x-2">

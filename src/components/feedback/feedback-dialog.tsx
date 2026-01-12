@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
+import { Label } from '../ui/label';
 
 // Initialize Firebase
 let firebaseApp;
@@ -122,7 +123,7 @@ export function FeedbackDialog({
         
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">How would you rate this response?</label>
+            <Label>How would you rate this response?</Label>
             <div className="flex space-x-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -130,6 +131,7 @@ export function FeedbackDialog({
                   type="button"
                   onClick={() => setFeedback({...feedback, rating: star})}
                   className={`text-3xl transition-colors ${feedback.rating >= star ? 'text-yellow-400' : 'text-muted-foreground hover:text-yellow-300'}`}
+                  aria-label={`Rate ${star} out of 5 stars`}
                 >
                   ★
                 </button>
@@ -138,11 +140,12 @@ export function FeedbackDialog({
           </div>
           
           <div className="space-y-2">
-            <label htmlFor="feedback-comment" className="text-sm font-medium">
+            <Label htmlFor="feedback-comment">
               Additional Comments
-            </label>
+            </Label>
             <Textarea
               id="feedback-comment"
+              name="feedback-comment"
               value={feedback.comment}
               onChange={(e) => setFeedback({...feedback, comment: e.target.value})}
               placeholder="What did you like or dislike? How can we improve?"
@@ -152,36 +155,36 @@ export function FeedbackDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-                <label className="text-sm font-medium">Feedback Type</label>
+                <Label htmlFor="feedback-type">Feedback Type</Label>
                 <Select
-                value={feedback.type}
-                onValueChange={(value: FeedbackType) => setFeedback({...feedback, type: value})}
+                  value={feedback.type}
+                  onValueChange={(value: FeedbackType) => setFeedback({...feedback, type: value})}
                 >
-                <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="rating">Rating</SelectItem>
-                    <SelectItem value="correction">Data Correction</SelectItem>
-                    <SelectItem value="suggestion">Suggestion</SelectItem>
-                    <SelectItem value="bug_report">Bug Report</SelectItem>
-                </SelectContent>
+                  <SelectTrigger id="feedback-type" name="feedback-type">
+                      <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="rating">Rating</SelectItem>
+                      <SelectItem value="correction">Data Correction</SelectItem>
+                      <SelectItem value="suggestion">Suggestion</SelectItem>
+                      <SelectItem value="bug_report">Bug Report</SelectItem>
+                  </SelectContent>
                 </Select>
             </div>
             <div className="space-y-2">
-                <label className="text-sm font-medium">Category</label>
+                <Label htmlFor="feedback-category">Category</Label>
                 <Select
-                value={feedback.category}
-                onValueChange={(value: FeedbackCategory) => setFeedback({...feedback, category: value})}
+                  value={feedback.category}
+                  onValueChange={(value: FeedbackCategory) => setFeedback({...feedback, category: value})}
                 >
-                <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="ai_analysis">AI Analysis</SelectItem>
-                    <SelectItem value="data_processing">Data Processing</SelectItem>
-                    <SelectItem value="ui_ux">UI/UX</SelectItem>
-                </SelectContent>
+                  <SelectTrigger id="feedback-category" name="feedback-category">
+                      <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="ai_analysis">AI Analysis</SelectItem>
+                      <SelectItem value="data_processing">Data Processing</SelectItem>
+                      <SelectItem value="ui_ux">UI/UX</SelectItem>
+                  </SelectContent>
                 </Select>
             </div>
           </div>

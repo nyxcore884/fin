@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'notifications'>('profile');
@@ -92,7 +94,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <Select value={theme} onValueChange={setTheme}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[180px]" id="theme-select">
                       <SelectValue placeholder="Select theme" />
                     </SelectTrigger>
                     <SelectContent>
@@ -156,11 +158,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-// Dummy components to avoid breaking the code, as Select is not in scope
-const Select: React.FC<any> = ({ children, ...props }) => <select {...props}>{children}</select>;
-const SelectTrigger: React.FC<any> = ({ children, ...props }) => <div {...props}>{children}</div>;
-const SelectValue: React.FC<any> = ({ children, ...props }) => <div {...props}>{children}</div>;
-const SelectContent: React.FC<any> = ({ children, ...props }) => <div {...props}>{children}</div>;
-const SelectItem: React.FC<any> = ({ children, ...props }) => <option {...props}>{children}</option>;
-const CardFooter: React.FC<any> = ({ children, ...props }) => <div className="p-6 pt-0" {...props}>{children}</div>;

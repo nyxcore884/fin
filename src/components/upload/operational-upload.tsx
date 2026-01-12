@@ -62,15 +62,11 @@ export function OperationalUpload({ onUploadComplete }: OperationalUploadProps) 
       });
 
       // Directly trigger backend processing via API route
-      // Ensure this call is awaited
       await fetch('/api/process-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       });
-
-      // Add a small delay to allow backend processing to initiate
-      await new Promise(resolve => setTimeout(resolve, 1000));
 
       onUploadComplete(sessionId);
 
@@ -101,7 +97,7 @@ export function OperationalUpload({ onUploadComplete }: OperationalUploadProps) 
         <div className="space-y-4">
             {/* File Upload */}
             <div className="space-y-2">
-                <Label>Financial Data File <span className="text-destructive">*</span></Label>
+                <Label htmlFor="operational-file">Financial Data File <span className="text-destructive">*</span></Label>
                 <p className="text-xs text-muted-foreground">
                     Upload your complete financial Excel file with multiple sheets.
                 </p>
@@ -116,6 +112,7 @@ export function OperationalUpload({ onUploadComplete }: OperationalUploadProps) 
                         <span>Click to browse or drag & drop file</span>
                         <input
                             id="operational-file"
+                            name="operational-file"
                             type="file"
                             accept=".xlsx,.xls"
                             onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
@@ -134,6 +131,7 @@ export function OperationalUpload({ onUploadComplete }: OperationalUploadProps) 
                 </p>
                 <Textarea
                     id="analysis-request"
+                    name="analysis-request"
                     value={analysisRequest}
                     onChange={(e) => setAnalysisRequest(e.target.value)}
                     placeholder="e.g., 'Find any miscounted personnel costs', 'Show me fuel spending by region last quarter', 'Compare actual vs budget for IT department'"

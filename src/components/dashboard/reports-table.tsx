@@ -61,7 +61,8 @@ export function ReportsTable({ reports }: ReportsTableProps) {
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" asChild>
-                    <Link href={`/reports/${report.id}`}>
+                    {/* This now links back to the main dashboard, as there's no individual report page yet */}
+                    <Link href={`/dashboard`}>
                       <ArrowRight className="h-4 w-4" />
                        <span className="sr-only">View Report</span>
                     </Link>

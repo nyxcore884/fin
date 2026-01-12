@@ -11,8 +11,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Lightbulb, Loader, Zap } from 'lucide-react';
-import { MOCK_SUGGESTIONS } from '@/lib/data';
 import { Separator } from '@/components/ui/separator';
+import { provideAnomalySuggestions } from '@/ai/flows/provide-anomaly-suggestions';
+import { useToast } from '@/hooks/use-toast';
 
 type Anomaly = {
     id: string;
@@ -26,24 +27,62 @@ type AnomalySuggestionDialogProps = {
   anomaly: Anomaly;
 };
 
+type Suggestions = {
+  reasons: string;
+  suggestions: string;
+  actions: string;
+}
+
 export function AnomalySuggestionDialog({ anomaly }: AnomalySuggestionDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<typeof MOCK_SUGGESTIONS | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
+  const { toast } = useToast();
 
   async function handleGetSuggestions() {
+    if (suggestions) return; // Don't re-fetch if already loaded
+
     setIsLoading(true);
-    // In a real app, this would be a server action calling the GenAI flow
-    // e.g., await provideAnomalySuggestions({ anomalyDescription: anomaly.description, ... })
-    await new Promise(resolve => setTimeout(resolve, 1500)); 
-    setSuggestions(MOCK_SUGGESTIONS);
-    setIsLoading(false);
+    try {
+      // In a real app, this would be a server action calling the GenAI flow
+      const result = await provideAnomalySuggestions({
+        // The user ID is handled securely on the backend by the flow
+        userId: 'anonymous_user', // Placeholder, not used by this specific flow logic
+        message: `Provide potential reasons, suggestions, and recommended actions for this financial anomaly: "${anomaly.description}"`
+      });
+      
+      // We need to parse the response to fit our UI structure.
+      // This is a simplification. A more robust solution would be a structured output from the LLM.
+      const responseText = result.response;
+      const reasonsMatch = responseText.match(/reasons:(.*?)suggestions:/is);
+      const suggestionsMatch = responseText.match(/suggestions:(.*?)actions:/is);
+      const actionsMatch = responseText.match(/actions:(.*)/is);
+
+      setSuggestions({
+          reasons: reasonsMatch ? reasonsMatch[1].trim() : "No potential reasons provided.",
+          suggestions: suggestionsMatch ? suggestionsMatch[1].trim() : "No suggestions provided.",
+          actions: actionsMatch ? actionsMatch[1].trim() : "No recommended actions provided.",
+      });
+
+    } catch(error) {
+       toast({
+        variant: 'destructive',
+        title: 'AI Insight Failed',
+        description: 'Could not generate AI-powered insights for this anomaly.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function onOpenChange(open: boolean) {
     setIsOpen(open);
     if (!open) {
-      setSuggestions(null);
+      // Reset state when closing, but after a delay to allow for animation
+      setTimeout(() => {
+        setSuggestions(null);
+        setIsLoading(false);
+      }, 300);
     }
   }
 
@@ -72,20 +111,20 @@ export function AnomalySuggestionDialog({ anomaly }: AnomalySuggestionDialogProp
             </div>
         )}
         {suggestions && !isLoading && (
-            <div className="grid gap-6 py-4 text-sm">
+            <div className="grid gap-6 py-4 text-sm max-h-[60vh] overflow-y-auto">
                 <div>
                     <h3 className="font-semibold text-lg mb-2">Potential Reasons</h3>
-                    <p className="text-muted-foreground">{suggestions.reasons}</p>
+                    <p className="text-muted-foreground whitespace-pre-wrap">{suggestions.reasons}</p>
                 </div>
                 <Separator />
                  <div>
                     <h3 className="font-semibold text-lg mb-2">Suggestions</h3>
-                    <p className="text-muted-foreground">{suggestions.suggestions}</p>
+                    <p className="text-muted-foreground whitespace-pre-wrap">{suggestions.suggestions}</p>
                 </div>
                  <Separator />
                  <div>
                     <h3 className="font-semibold text-lg mb-2">Recommended Actions</h3>
-                    <p className="text-muted-foreground">{suggestions.actions}</p>
+                    <p className="text-muted-foreground whitespace-pre-wrap">{suggestions.actions}</p>
                 </div>
             </div>
         )}

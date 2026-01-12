@@ -22,8 +22,7 @@ import {
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/upload', icon: UploadCloud, label: 'Upload Data' },
-  // The main /reports link now goes to the dashboard, which contains the list
-  { href: '/dashboard', icon: FileText, label: 'Reports' }, 
+  { href: '/reports', icon: FileText, label: 'Reports' }, 
   { href: '/settings', icon: Settings, label: 'Settings' },
 ];
 

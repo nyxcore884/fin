@@ -18,9 +18,10 @@ type AnomaliesListProps = {
     severity: 'high' | 'medium' | 'low';
     date: string;
   }[];
+  sessionId?: string;
 };
 
-export function AnomaliesList({ anomalies }: AnomaliesListProps) {
+export function AnomaliesList({ anomalies, sessionId }: AnomaliesListProps) {
   return (
     <Card className="h-full bg-card/80 backdrop-blur-sm">
       <CardHeader>
@@ -50,7 +51,7 @@ export function AnomaliesList({ anomalies }: AnomaliesListProps) {
                 </div>
                 <p className="text-sm text-muted-foreground">{anomaly.description}</p>
               </div>
-               <AnomalySuggestionDialog anomaly={anomaly} />
+               <AnomalySuggestionDialog anomaly={anomaly} sessionId={sessionId} />
             </div>
           ))}
            {anomalies.length === 0 && (

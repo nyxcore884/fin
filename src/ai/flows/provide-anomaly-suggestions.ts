@@ -21,8 +21,8 @@ if (admin.apps.length === 0) {
 }
 
 const AnomalySuggestionInputSchema = z.object({
-  message: z.string().describe('The user\'s query about their financial data.'),
-  userId: z.string().describe('The authenticated user\'s ID.'),
+  message: z.string().describe("The user's query about their financial data, or a specific anomaly description."),
+  userId: z.string().describe("The authenticated user's ID."),
   sessionId: z.string().optional().describe('The specific session ID to query data from.'),
 });
 export type AnomalySuggestionInput = z.infer<typeof AnomalySuggestionInputSchema>;
@@ -98,25 +98,21 @@ const provideAnomalySuggestionsFlow = ai.defineFlow(
     }
 
     const prompt = `
-      You are a financial analyst AI assistant for a gas distribution company. 
-      The user has asked: "${message}"
+      You are a senior financial analyst AI assistant for a gas distribution company.
+      The user is asking for more information about a financial issue or anomaly.
+      The user's query is: "${message}"
 
-      Here is the user's financial data context (if available):
+      Here is the user's financial data context for the relevant reporting period (if available):
       ${userData || "No financial data available for this user."}
 
-      Please provide a comprehensive, helpful response based on their data. 
-      If they're asking about specific financial metrics, trends, or insights, 
-      reference their actual data in your response.
+      Please provide a comprehensive, helpful response. Your response should be structured in three parts:
+      1.  **Potential Reasons:** Based on the data and the user's query, list the most likely underlying causes for this issue.
+      2.  **Suggestions:** Offer concrete suggestions for what the user should investigate further.
+      3.  **Recommended Actions:** Propose specific, actionable steps the user or their team can take to address, mitigate, or resolve the issue.
 
-      Key guidelines:
-      1. Be precise and data-driven.
-      2. Reference specific numbers from their data when relevant.
-      3. Provide actionable insights.
-      4. Explain complex financial concepts in simple terms.
-      5. If they ask about something not in the data, politely explain the limitation.
-      6. Format your response clearly with markdown, using bullet points and sections when appropriate.
-
-      Response:
+      - Be precise and data-driven, referencing specific numbers from their data when relevant.
+      - Explain complex financial concepts in simple terms.
+      - Format your response clearly with markdown, using bold headings for each of the three sections.
     `;
 
     const result = await ai.generate({ prompt });

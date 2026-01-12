@@ -25,12 +25,6 @@ export default function AIChat({ onClose, currentSessionId }: AIChatProps) {
     }
   };
 
-  const handleQuickAction = (text: string) => {
-    setInputMessage(text);
-    sendMessage(text);
-    setInputMessage('');
-  };
-
   return (
     <div className="flex flex-col h-full bg-background border border-primary rounded-lg">
       <div className="flex items-center justify-between p-4 border-b border-primary">
@@ -91,12 +85,6 @@ export default function AIChat({ onClose, currentSessionId }: AIChatProps) {
 
       {/* Input Area */}
       <div className="p-4 border-t border-border">
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleQuickAction("What are the main cost drivers in my latest report?")}>Cost Analysis</Button>
-          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleQuickAction("Show me revenue trends across my reports")}>Revenue Trends</Button>
-          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleQuickAction("What anomalies were detected in my data?")}>Anomalies</Button>
-          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleQuickAction("Give me recommendations for cost optimization")}>Recommendations</Button>
-        </div>
         <div className="flex space-x-2">
           <Input
             type="text"
@@ -114,6 +102,9 @@ export default function AIChat({ onClose, currentSessionId }: AIChatProps) {
             Send
           </Button>
         </div>
+         <p className="text-xs text-muted-foreground mt-2 text-center">
+            For detailed anomaly analysis, use the 'AI Insight' button on the dashboard.
+        </p>
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import { Lightbulb, Loader, Zap } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { provideAnomalySuggestions } from '@/ai/flows/provide-anomaly-suggestions';
 import { useToast } from '@/hooks/use-toast';
+import ReactMarkdown from 'react-markdown';
 
 type Anomaly = {
     id: string;
@@ -25,44 +26,28 @@ type Anomaly = {
 
 type AnomalySuggestionDialogProps = {
   anomaly: Anomaly;
+  sessionId?: string;
 };
 
-type Suggestions = {
-  reasons: string;
-  suggestions: string;
-  actions: string;
-}
-
-export function AnomalySuggestionDialog({ anomaly }: AnomalySuggestionDialogProps) {
+export function AnomalySuggestionDialog({ anomaly, sessionId }: AnomalySuggestionDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
+  const [suggestion, setSuggestion] = useState<string | null>(null);
   const { toast } = useToast();
 
   async function handleGetSuggestions() {
-    if (suggestions) return; // Don't re-fetch if already loaded
+    if (suggestion) return; // Don't re-fetch if already loaded
 
     setIsLoading(true);
     try {
-      // In a real app, this would be a server action calling the GenAI flow
       const result = await provideAnomalySuggestions({
-        // The user ID is handled securely on the backend by the flow
-        userId: 'anonymous_user', // Placeholder, not used by this specific flow logic
-        message: `Provide potential reasons, suggestions, and recommended actions for this financial anomaly: "${anomaly.description}"`
+        // In a real app with auth, this would be the actual user ID
+        userId: 'anonymous-user', 
+        message: `Provide potential reasons, suggestions, and recommended actions for this financial anomaly: "${anomaly.description}"`,
+        sessionId: sessionId,
       });
       
-      // We need to parse the response to fit our UI structure.
-      // This is a simplification. A more robust solution would be a structured output from the LLM.
-      const responseText = result.response;
-      const reasonsMatch = responseText.match(/reasons:(.*?)suggestions:/is);
-      const suggestionsMatch = responseText.match(/suggestions:(.*?)actions:/is);
-      const actionsMatch = responseText.match(/actions:(.*)/is);
-
-      setSuggestions({
-          reasons: reasonsMatch ? reasonsMatch[1].trim() : "No potential reasons provided.",
-          suggestions: suggestionsMatch ? suggestionsMatch[1].trim() : "No suggestions provided.",
-          actions: actionsMatch ? actionsMatch[1].trim() : "No recommended actions provided.",
-      });
+      setSuggestion(result.response);
 
     } catch(error) {
        toast({
@@ -77,19 +62,15 @@ export function AnomalySuggestionDialog({ anomaly }: AnomalySuggestionDialogProp
 
   function onOpenChange(open: boolean) {
     setIsOpen(open);
-    if (!open) {
-      // Reset state when closing, but after a delay to allow for animation
-      setTimeout(() => {
-        setSuggestions(null);
-        setIsLoading(false);
-      }, 300);
+    if (open) {
+        handleGetSuggestions();
     }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" onClick={handleGetSuggestions}>
+        <Button variant="ghost" size="sm">
           <Zap className="mr-2 h-4 w-4 text-accent" />
           AI Insight
         </Button>
@@ -110,22 +91,9 @@ export function AnomalySuggestionDialog({ anomaly }: AnomalySuggestionDialogProp
                 <p className="text-muted-foreground">Generating insights...</p>
             </div>
         )}
-        {suggestions && !isLoading && (
-            <div className="grid gap-6 py-4 text-sm max-h-[60vh] overflow-y-auto">
-                <div>
-                    <h3 className="font-semibold text-lg mb-2">Potential Reasons</h3>
-                    <p className="text-muted-foreground whitespace-pre-wrap">{suggestions.reasons}</p>
-                </div>
-                <Separator />
-                 <div>
-                    <h3 className="font-semibold text-lg mb-2">Suggestions</h3>
-                    <p className="text-muted-foreground whitespace-pre-wrap">{suggestions.suggestions}</p>
-                </div>
-                 <Separator />
-                 <div>
-                    <h3 className="font-semibold text-lg mb-2">Recommended Actions</h3>
-                    <p className="text-muted-foreground whitespace-pre-wrap">{suggestions.actions}</p>
-                </div>
+        {suggestion && !isLoading && (
+            <div className="prose prose-sm dark:prose-invert max-h-[60vh] overflow-y-auto rounded-lg bg-muted/30 p-4">
+               <ReactMarkdown>{suggestion}</ReactMarkdown>
             </div>
         )}
       </DialogContent>

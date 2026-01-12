@@ -47,7 +47,11 @@ export function DashboardClient() {
         setReports(reportsData);
 
         if (snapshot.docs.length > 0) {
-            setLatestReport(snapshot.docs[0].data());
+            const latest = snapshot.docs[0].data();
+            setLatestReport({
+                ...latest,
+                id: snapshot.docs[0].id // Add the document ID to the report object
+            });
         } else {
             setLatestReport(null);
         }
@@ -123,7 +127,7 @@ export function DashboardClient() {
 
       {/* Anomalies List */}
       <div className="lg:col-span-5">
-        <AnomaliesList anomalies={anomalies} />
+        <AnomaliesList anomalies={anomalies} sessionId={latestReport.sessionId} />
       </div>
 
       {/* Reports Table */}

@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import { Skeleton } from '../ui/skeleton'; // Import Skeleton component
 
 type StatCardProps = {
   name: string;

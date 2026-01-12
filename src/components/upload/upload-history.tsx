@@ -60,7 +60,7 @@ export default function UploadHistory({ newSessionId }: UploadHistoryProps) {
     });
 
     return () => unsubscribe();
-  }, [newSessionId]); // Rerun effect when a new upload is completed
+  }, []); // Rerun effect when a new upload is completed
 
   const getStatusBadge = (status: string) => {
     switch (status) {

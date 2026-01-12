@@ -1,3 +1,4 @@
+tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -129,25 +130,33 @@ export default function ReportsPage() {
             <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Reports</CardTitle>
             </CardHeader>
-            <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16"/> : aggregateMetrics.reportCount}</p></CardContent>
+            <CardContent>
+              {loading ? <Skeleton className="h-8 w-16"/> : <div className="text-2xl font-bold">{aggregateMetrics.reportCount}</div>}
+            </CardContent>
         </Card>
          <Card>
             <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Costs</CardTitle>
             </CardHeader>
-            <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-32"/> : `$${aggregateMetrics.totalCosts.toLocaleString()}`}</p></CardContent>
+            <CardContent>
+              {loading ? <Skeleton className="h-8 w-32"/> : <div className="text-2xl font-bold">`${aggregateMetrics.totalCosts.toLocaleString()}`}</div>}
+            </CardContent>
         </Card>
          <Card>
             <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Retail Revenue</CardTitle>
             </CardHeader>
-            <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-32"/> : `$${aggregateMetrics.retailRevenue.toLocaleString()}`}</p></CardContent>
+            <CardContent>
+              {loading ? <Skeleton className="h-8 w-32"/> : <div className="text-2xl font-bold">`${aggregateMetrics.retailRevenue.toLocaleString()}`}</div>}
+            </CardContent>
         </Card>
          <Card>
             <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Wholesale Revenue</CardTitle>
             </CardHeader>
-            <CardContent><p className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-32"/> : `$${aggregateMetrics.wholesaleRevenue.toLocaleString()}`}</p></CardContent>
+            <CardContent>
+              {loading ? <Skeleton className="h-8 w-32"/> : <div className="text-2xl font-bold">`${aggregateMetrics.wholesaleRevenue.toLocaleString()}`}</div>}
+            </CardContent>
         </Card>
       </div>
 
@@ -197,13 +206,13 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                         <h3 className="text-sm font-medium text-muted-foreground">Total Costs</h3>
-                        <p className="text-2xl font-bold">${selectedReport.verifiedMetrics.totalCosts.toLocaleString()}</p>
+                        <div className="text-2xl font-bold">${selectedReport.verifiedMetrics.totalCosts.toLocaleString()}</div>
                         </div>
                         <div>
                         <h3 className="text-sm font-medium text-muted-foreground">Total Revenue</h3>
-                        <p className="text-2xl font-bold">
+                        <div className="text-2xl font-bold">
                             ${(selectedReport.verifiedMetrics.retailRevenue + selectedReport.verifiedMetrics.wholesaleRevenue).toLocaleString()}
-                        </p>
+                        </div>
                         </div>
                     </div>
                     <Separator/>

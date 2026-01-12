@@ -30,11 +30,17 @@ export async function classifyRevenue(input: ClassifyRevenueInput): Promise<Clas
   return classifyRevenueFlow(input);
 }
 
+// Add the multiLanguageRule constant here
+const multiLanguageRule = `CRITICAL: The provided revenue entry may contain descriptions and labels in English, Georgian (ქართული), and Russian (Русский). You MUST analyze the text in its original language without translating it. Understand the context and use the original language terms for classification.`;
+
+
 const classifyRevenuePrompt = ai.definePrompt({
   name: 'classifyRevenuePrompt',
   input: {schema: ClassifyRevenueInputSchema},
   output: {schema: ClassifyRevenueOutputSchema},
-  prompt: `You are a revenue classification expert.
+  prompt: `${multiLanguageRule}
+
+You are a revenue classification expert.
 Given the following revenue entry, classify it as either 'retail' or 'wholesale'.
 Consider the following keywords:
 Retail Keywords: {{{keywordsRetail}}}

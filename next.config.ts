@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  env: {
+    GCP_PROJECT: process.env.GCP_PROJECT,
+    FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
+  },
 };
 // Trigger rebuild
 export default nextConfig;

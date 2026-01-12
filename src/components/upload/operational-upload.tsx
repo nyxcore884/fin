@@ -62,11 +62,15 @@ export function OperationalUpload({ onUploadComplete }: OperationalUploadProps) 
       });
 
       // Directly trigger backend processing via API route
+      // Ensure this call is awaited
       await fetch('/api/process-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       });
+
+      // Add a small delay to allow backend processing to initiate
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       onUploadComplete(sessionId);
 

@@ -79,7 +79,7 @@ export function ConfigurationUpload({ onUploadComplete }: ConfigurationUploadPro
     setProgress(0);
     const newSessionId = uuidv4();
 
-    const filesToUpload = fileTypes.map(ft => ({ id: ft.id, file: selectedFiles[ft.id], required: ft.required, label: ft.label }))
+    const filesToUpload = fileTypes.map(ft => ({ id: ft.id, file: selectedFiles[ft.id], label: ft.label }))
       .filter(f => f.file);
 
     if (filesToUpload.length === 0) {
@@ -130,7 +130,7 @@ export function ConfigurationUpload({ onUploadComplete }: ConfigurationUploadPro
     }
   };
 
-  const canUpload = fileTypes.filter(ft => ft.required).every(ft => selectedFiles[ft.id]);
+  const canUpload = Object.values(selectedFiles).some(file => file !== null);
   
   if (isProcessing) {
     return (
@@ -199,8 +199,8 @@ export function ConfigurationUpload({ onUploadComplete }: ConfigurationUploadPro
           )}
         </Button>
          {!canUpload && !isProcessing && (
-          <p className="text-sm text-destructive">
-            Please upload all required files (marked with *) to proceed.
+          <p className="text-sm text-muted-foreground">
+            Please select at least one file to upload.
           </p>
         )}
       </div>

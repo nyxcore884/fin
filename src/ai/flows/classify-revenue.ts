@@ -4,7 +4,7 @@
 /**
  * @fileOverview This file defines a Genkit flow for classifying revenue entries as 'retail' or 'wholesale' based on keywords.
  *
- * The flow takes a revenue report entry as input and returns a classification result ('retail' or 'wholesale').
+ * The flow takes a revenue report entry as input and and returns a classification result ('retail' or 'wholesale').
  * @file
  * - classifyRevenue - The function to classify revenue entries.
  * - ClassifyRevenueInput - The input type for the classifyRevenue function.

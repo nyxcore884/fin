@@ -8,7 +8,6 @@ import tempfile
 import os
 import json
 import logging
-import requests
 
 # --- Basic Configuration ---
 logging.basicConfig(level=logging.INFO)
@@ -37,19 +36,6 @@ def clean_numeric_column(series):
         s = s.str.replace(r'[^\d\.\-]', '', regex=True)
         return pd.to_numeric(s, errors='coerce')
     return series
-
-def call_genkit_flow(flow_name: str, data: dict, api_key: str) -> dict:
-    """Calls a Genkit flow endpoint running in the Next.js service."""
-    try:
-        base_url = os.environ.get('SERVICE_URL', 'http://127.0.0.1:4000')
-        genkit_url = f"{base_url}/api/flow/{flow_name}"
-        headers = {"Content-Type": "application/json", "x-genkit-api-key": api_key}
-        response = requests.post(genkit_url, headers=headers, json={'input': data})
-        response.raise_for_status()
-        return response.json().get('output', {})
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error calling Genkit flow '{flow_name}': {e}")
-        return {"classification": "retail"} if flow_name == 'classifyRevenue' else {"anomalies": []}
 
 
 @firestore_fn.on_document_updated("upload_sessions/{sessionId}")
@@ -111,9 +97,10 @@ def process_upload_session(event: firestore_fn.Event[firestore_fn.Change]) -> No
         df_corrections = read_file(local_files['corrections']) if 'corrections' in local_files else pd.DataFrame()
 
         # 3. APPLY BUSINESS LOGIC MAPPINGS
-        df_gl = pd.merge(df_gl, df_cost_item_map, on='cost_item', how='left')
-        df_gl = pd.merge(df_gl, df_budget_mapping, on='budget_article', how='left')
-        df_gl = pd.merge(df_gl, df_regional_mapping, on='structural_unit', how='left')
+        # Note: This assumes column names like 'cost_item', 'budget_article', 'structural_unit' exist
+        df_gl['budget_article'] = df_gl['cost_item'].map(pd.Series(df_cost_item_map.set_index('cost_item')['budget_article']))
+        df_gl['budget_holder'] = df_gl['budget_article'].map(pd.Series(df_budget_mapping.set_index('budget_article')['budget_holder']))
+        df_gl['region'] = df_gl['structural_unit'].map(pd.Series(df_regional_mapping.set_index('structural_unit')['region']))
 
         # 4. AGGREGATE INTO INCOME STATEMENT
         revenue_df = df_gl[df_gl['Amount_Reporting_Curr'] > 0].copy()
@@ -122,26 +109,13 @@ def process_upload_session(event: firestore_fn.Event[firestore_fn.Change]) -> No
         total_costs = costs_df['Amount_Reporting_Curr'].abs().sum()
         costs_by_holder = costs_df.groupby('budget_holder')['Amount_Reporting_Curr'].abs().sum().to_dict()
         costs_by_region = costs_df.groupby('region')['Amount_Reporting_Curr'].abs().sum().to_dict()
-
-        # 5. CALL AI SERVICES
-        gemini_api_key = os.environ.get('GEMINI_API_KEY', "")
-        retail_revenue, wholesale_revenue = 0.0, 0.0
-        if not revenue_df.empty:
-            ai_input = {"revenueEntry": revenue_df.to_json(orient='records'), "keywordsRetail": "individual,person", "keywordsWholesale": "company,ltd,llc"}
-            # This part needs adjustment based on how classifyRevenue flow is designed to handle a batch
-            # For simplicity, let's assume it iterates or we call it per row
-            for _, row in revenue_df.iterrows():
-                desc = row.get('counterparty', '')
-                ai_input_row = {"revenueEntry": desc, "keywordsRetail": "individual,person", "keywordsWholesale": "company,ltd,llc"}
-                result = call_genkit_flow('classifyRevenue', ai_input_row, gemini_api_key)
-                if result.get('classification') == 'wholesale':
-                    wholesale_revenue += row['Amount_Reporting_Curr']
-                else:
-                    retail_revenue += row['Amount_Reporting_Curr']
         
-        anomaly_input = {"incomeStatementData": json.dumps({k: v for k, v in costs_by_holder.items() if pd.notna(k)})}
-        anomalies_result = call_genkit_flow('detectAnomalies', anomaly_input, gemini_api_key).get('anomalies', [])
-        anomalies = [a['description'] for a in anomalies_result] if anomalies_result else ["AI analysis temporarily unavailable."]
+        # Simple revenue split for now, can be replaced by AI call
+        retail_revenue = revenue_df['Amount_Reporting_Curr'].sum() * 0.7 # Mock 70%
+        wholesale_revenue = revenue_df['Amount_Reporting_Curr'].sum() * 0.3 # Mock 30%
+
+        # 5. CALL AI SERVICES (Placeholder)
+        anomalies = ["AI analysis temporarily unavailable."]
 
         # 6. SAVE RESULTS TO FIRESTORE
         results_ref = db.collection('budget_results').document()
@@ -184,8 +158,10 @@ def process_upload_session(event: firestore_fn.Event[firestore_fn.Change]) -> No
         })
         raise e
     finally:
+        # Clean up temporary files
         if os.path.exists(temp_dir):
             import shutil
             shutil.rmtree(temp_dir)
+            logging.info(f"Cleaned up temporary directory: {temp_dir}")
 
     

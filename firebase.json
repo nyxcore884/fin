@@ -1,39 +1,22 @@
 {
+  "hosting": {
+    "public": "out",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  },
   "functions": [
     {
+      "runtime": "python311",
       "source": "functions",
-      "codebase": "python-functions",
-      "runtime": "python311"
+      "region": "europe-west1",
+      "timeoutSeconds": 60,
+      "memory": "256MB"
     },
     {
-      "source": "genkit",
-      "codebase": "nodejs-functions",
       "runtime": "nodejs20",
-      "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" ci"
-      ]
+      "source": "genkit",
+      "region": "europe-west1",
+      "timeoutSeconds": 60,
+      "memory": "256MB"
     }
-  ],
-  "hosting": {
-    "public": ".next",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "/api/process-session",
-        "function": {
-          "functionId": "process_upload_session",
-          "region": "us-central1",
-          "codebase": "python-functions"
-        }
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
-  }
+  ]
 }

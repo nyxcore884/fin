@@ -1,9 +1,5 @@
-pandas
 firebase-admin
-firebase-functions
-openpyxl
-numpy
-requests
+google-cloud-firestore
 google-cloud-storage
-
-    
+pandas
+requests

@@ -1,8 +1,19 @@
 {
-  "functions": {
-    "source": "functions",
-    "runtime": "python311"
-  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "python-functions",
+      "runtime": "python311"
+    },
+    {
+      "source": "genkit",
+      "codebase": "nodejs-functions",
+      "runtime": "nodejs20",
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" ci"
+      ]
+    }
+  ],
   "hosting": {
     "public": ".next",
     "ignore": [
@@ -12,8 +23,16 @@
     ],
     "rewrites": [
       {
+        "source": "/api/process-session",
+        "function": {
+          "functionId": "process_upload_session",
+          "region": "us-central1",
+          "codebase": "python-functions"
+        }
+      },
+      {
         "source": "**",
-        "function": "process_financial_data"
+        "destination": "/index.html"
       }
     ]
   }

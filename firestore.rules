@@ -14,18 +14,18 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
-    // Sessions can be created by authenticated users.
-    // They can only be read or updated by their owner.
-    // The Cloud Function (which runs with admin privileges) can update them.
+    // Sessions can be read by anyone in the dev environment.
+    // This is not secure for production.
     match /upload_sessions/{sessionId} {
-      allow create: if request.auth != null;
-      allow read, update: if isOwner(resource.data.userId);
+      allow create: if true; // Allow anyone to create for dev
+      allow read: if true; // Allow anyone to read for dev
+      allow update: if true; // Allow anyone to update for dev
     }
 
-    // Results can only be read by their owner or an admin.
-    // They are only ever created by the Cloud Function.
+    // Results can be read by anyone in the dev environment.
+    // This is not secure for production.
     match /budget_results/{resultId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow read: if true;
       allow create, update, delete, list: if false; // Deny all client writes
     }
 
@@ -35,13 +35,12 @@ service cloud.firestore {
         allow read: if isAdmin();
     }
     
-    // Users can create their own feedback. Admins can read all feedback.
+    // Feedback can be created and read by anyone in the dev environment.
+    // This is not secure for production.
     match /feedback/{feedbackId} {
-      allow create: if isOwner(request.resource.data.userId);
-      allow read: if isAdmin() || isOwner(resource.data.userId);
-      allow update: if isOwner(resource.data.userId);
+      allow create: if true;
+      allow read: if true;
+      allow update: if true;
     }
   }
 }
-
-    

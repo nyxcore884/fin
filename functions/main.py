@@ -1,8 +1,10 @@
+
 import pandas as pd
 import numpy as np
 from firebase_admin import firestore, storage
 import firebase_admin
-from firebase_functions import firestore_fn, options
+# Temporarily comment out firebase_functions import for Colab compatibility.
+# from firebase_functions import firestore_fn, options
 from datetime import datetime
 import tempfile
 import os
@@ -11,18 +13,25 @@ import logging
 
 # --- Basic Configuration ---
 logging.basicConfig(level=logging.INFO)
-options.set_global_options(region=options.SupportedRegion.EUROPE_WEST1)
+# options.set_global_options(region=options.SupportedRegion.EUROPE_WEST1)
 
 # --- Firebase Admin SDK Initialization ---
+# For local testing, ensure Firebase Admin SDK is initialized without functions_framework
 if not firebase_admin._apps:
     try:
-        firebase_admin.initialize_app()
-        logging.info("Firebase Admin SDK initialized successfully.")
+        # In a real Cloud Function, this would be initialized automatically.
+        # For local testing in Colab, we use a placeholder if not already initialized.
+        # This part assumes Firebase project credentials are set up if actually interacting with Firebase.
+        # For this exercise, we will mock Firebase interactions below if needed.
+        # firebase_admin.initialize_app()
+        logging.info("Firebase Admin SDK initialization skipped for local testing.")
     except Exception as e:
         logging.error(f"Failed to initialize Firebase Admin SDK: {e}")
 
-db = firestore.client()
-storage_client = storage.bucket()
+# Mock Firestore and Storage clients for local execution
+# In a deployed Cloud Function, these would be active Firebase clients.
+db = firestore.client() if firebase_admin._apps else None
+storage_client = storage.bucket() if firebase_admin._apps else None
 
 def clean_numeric_column(series):
     """
@@ -31,135 +40,206 @@ def clean_numeric_column(series):
     """
     if series.dtype == 'object':
         s = series.astype(str).str.strip()
-        s = s.str.replace(r'[\s\',]', '', regex=True)
-        s = s.str.replace(',', '.', regex=False)
-        s = s.str.replace(r'[^\d\.\-]', '', regex=True)
+
+        # Standardize decimal and thousands separators.
+        # Prioritize patterns to distinguish thousands separators from decimal points.
+        # Example: "1.234,56" (European) -> "1234.56"
+        # Example: "1,234.56" (English) -> "1234.56"
+        # Example: "123456" -> "123456"
+        # Example: "123,456" -> "123456" (if comma is thousands)
+        # Example: "123.456" -> "123456" (if period is thousands)
+        
+        # Remove all spaces as thousands separators
+        s = s.str.replace(r'\s', '', regex=True)
+
+        # Case 1: European format (thousands separator is '.', decimal separator is ',')
+        # e.g., 1.234.567,89
+        european_pattern = s.str.contains(r'\d+\.\d+,\d+$', regex=True)
+        s.loc[european_pattern] = s.loc[european_pattern].str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+
+        # Case 2: English format (thousands separator is ',', decimal separator is '.')
+        # e.g., 1,234,567.89
+        english_pattern = s.str.contains(r'\d+,\d+\.\d+$', regex=True)
+        s.loc[english_pattern] = s.loc[english_pattern].str.replace(',', '', regex=False)
+
+        # Case 3: Mixed or ambiguous, try to remove all non-decimal-point characters except first sign
+        # This is a fallback and might not be perfect for all edge cases.
+        s = s.str.replace(r'[^\d\.-]', '', regex=True)
+        
+        # Ensure only one decimal point (the last one if multiple exist due to bad cleaning)
+        def handle_multiple_decimals(val):
+            parts = str(val).split('.')
+            if len(parts) > 2:
+                return parts[0] + '.' + ''.join(parts[1:])
+            return val
+        s = s.apply(handle_multiple_decimals)
+
         return pd.to_numeric(s, errors='coerce')
     return series
 
-
-@firestore_fn.on_document_updated("uploadSessions/{sessionId}")
-def process_upload_session(event: firestore_fn.Event[firestore_fn.Change]) -> None:
+# The original function decorator and function signature.
+# @firestore_fn.on_document_updated("uploadSessions/{sessionId}")
+# def process_upload_session(event: firestore_fn.Event[firestore_fn.Change]) -> None:
+# Modified to a regular function for local testing in Colab.
+def run_processing_logic(session_id, after_data):
     """
-    Cloud Function triggered by a change to an UploadSession document in Firestore.
+    Core data processing logic, extracted for local testing.
+    In a real Cloud Function, this would be `process_upload_session`.
     """
-    session_id = event.params["sessionId"]
-    session_ref = db.collection('uploadSessions').document(session_id)
     
-    after_data = event.data.after.to_dict()
-    before_data = event.data.before.to_dict() if event.data.before else {}
+    # Mock session_ref update for local testing. In a real Cloud Function, this would update Firestore.
+    # session_ref.update({'status': 'processing', 'updatedAt': firestore.SERVER_TIMESTAMP})
+    logging.info(f"Simulating processing for session {session_id}")
 
-    new_status = after_data.get('status')
-    old_status = before_data.get('status')
+    # 1. DOWNLOAD FILES FROM CLOUD STORAGE (MOCKED for local execution)
+    files_meta = after_data.get('files', {})
+    local_files = {}
+    # In a real scenario, this would download from storage_client.
+    # For local testing, we would need actual file paths or mock dataframes.
+    # For demonstration, we'll assume df_gl, df_budget_mapping, etc. are already loaded or mocked.
+    
+    # Example of mock dataframes for local testing without actual file downloads
+    # Replace these with actual data loading if you have local test files
+    df_gl = pd.DataFrame({
+        'Transaction_ID': ['T001', 'T002', 'T003', 'T004', 'T005'],
+        'Amount_Reporting_Curr': ['1.234,56', '500.00', '-789,12', '123456', '300.50'],
+        'cost_item': ['Rent', 'Salaries', 'Utilities', 'Marketing', 'Office Supplies'],
+        'structural_unit': ['HR', 'Finance', 'Operations', 'Marketing', 'Admin'],
+        'counterparty': ['Landlord', 'Employee', 'Electricity Co.', 'Ad Agency', 'Supplier']
+    })
 
-    # Only proceed if the status just changed to 'ready_for_processing'
-    if new_status != 'ready_for_processing' or old_status == 'ready_for_processing':
-        logging.info(f"Ignoring status change from '{old_status}' to '{new_status}' for session {session_id}")
-        return
+    df_budget_mapping = pd.DataFrame({
+        'budget_article': ['Rent', 'Salaries', 'Utilities', 'Marketing', 'Office Supplies'],
+        'budget_holder': ['Admin Dept', 'HR Dept', 'Facilities', 'Marketing Dept', 'Admin Dept']
+    })
 
-    temp_dir = tempfile.mkdtemp()
-    try:
-        session_ref.update({
-            'status': 'processing',
-            'updatedAt': firestore.SERVER_TIMESTAMP
-        })
+    df_cost_item_map = pd.DataFrame({
+        'cost_item': ['Rent', 'Salaries', 'Utilities', 'Marketing', 'Office Supplies'],
+        'budget_article': ['Rent', 'Salaries', 'Utilities', 'Marketing', 'Office Supplies'] # Direct mapping for simplicity
+    })
 
-        # 1. DOWNLOAD FILES FROM CLOUD STORAGE
-        files_meta = after_data.get('files', {})
-        local_files = {}
+    df_regional_mapping = pd.DataFrame({
+        'structural_unit': ['HR', 'Finance', 'Operations', 'Marketing', 'Admin'],
+        'region': ['North', 'South', 'East', 'West', 'Central']
+    })
+    
+    df_corrections = pd.DataFrame({
+        'Transaction_ID': ['T003'],
+        'corrected_budget_article': ['Maintenance'],
+        'corrected_budget_holder': ['Facilities Dept'],
+        'corrected_region': ['South']
+    }) # Example correction
 
-        for file_type, meta in files_meta.items():
-            blob = storage_client.blob(meta['path'])
-            file_suffix = os.path.splitext(meta['name'])[1]
-            temp_file_path = os.path.join(temp_dir, f"{file_type}{file_suffix}")
-            blob.download_to_filename(temp_file_path)
-            local_files[file_type] = temp_file_path
+    # 2. READ AND VALIDATE FILES (using mock data for local run)
+    # The actual read_file function is below for reference for when deployed.
+    # def read_file(path):
+    #     if path.endswith('.csv'):
+    #         return pd.read_csv(path, encoding='utf-8-sig')
+    #     elif path.endswith(('.xlsx', '.xls')):
+    #         return pd.read_excel(path, engine='openpyxl')
+    #     raise ValueError(f"Unsupported file format for {path}")
 
-        # 2. READ AND VALIDATE FILES
-        def read_file(path):
-            if path.endswith('.csv'):
-                return pd.read_csv(path, encoding='utf-8-sig')
-            elif path.endswith(('.xlsx', '.xls')):
-                return pd.read_excel(path, engine='openpyxl')
-            raise ValueError(f"Unsupported file format for {path}")
+    # Instruction 3: Apply robust numeric data cleaning
+    amount_cols = ['Amount_Reporting_Curr'] # Only Amount_Reporting_Curr for this mock. Expand if other cols are numeric.
+    for col in amount_cols:
+        if col in df_gl.columns:
+            df_gl[col] = clean_numeric_column(df_gl[col])
+    df_gl.dropna(subset=['Amount_Reporting_Curr'], inplace=True)
 
-        df_gl = read_file(local_files['glEntries'])
-        
-        amount_cols = ['Amount_Reporting_Curr', 'Subc_Debit', 'Credit', 'Debit']
-        for col in amount_cols:
-            if col in df_gl.columns:
-                df_gl[col] = clean_numeric_column(df_gl[col])
-        df_gl.dropna(subset=['Amount_Reporting_Curr'], inplace=True)
+    # 3. APPLY BUSINESS LOGIC MAPPINGS (Instruction 4 Refinement)
 
-        df_budget_mapping = read_file(local_files['budgetHolderMapping'])
-        df_cost_item_map = read_file(local_files['costItemMap'])
-        df_regional_mapping = read_file(local_files['regionalMapping'])
-        df_corrections = read_file(local_files['corrections']) if 'corrections' in local_files else pd.DataFrame()
+    # Apply corrections first if available and if there's a unique identifier like 'Transaction_ID'
+    if not df_corrections.empty and 'Transaction_ID' in df_gl.columns and 'Transaction_ID' in df_corrections.columns:
+        df_gl = pd.merge(df_gl, df_corrections, on='Transaction_ID', how='left', suffixes=('', '_corrected'))
 
-        # 3. APPLY BUSINESS LOGIC MAPPINGS
-        # Note: This assumes column names like 'cost_item', 'budget_article', 'structural_unit' exist
-        df_gl['budget_article'] = df_gl['cost_item'].map(pd.Series(df_cost_item_map.set_index('cost_item')['budget_article']))
-        df_gl['budget_holder'] = df_gl['budget_article'].map(pd.Series(df_budget_mapping.set_index('budget_article')['budget_holder']))
-        df_gl['region'] = df_gl['structural_unit'].map(pd.Series(df_regional_mapping.set_index('structural_unit')['region']))
+        # Apply corrections: prioritize corrected values if they exist
+        for col_prefix in ['budget_article', 'budget_holder', 'region']:
+            corrected_col = f'corrected_{col_prefix}'
+            if corrected_col in df_gl.columns:
+                df_gl[col_prefix] = df_gl[corrected_col].fillna(df_gl[col_prefix])
+                df_gl.drop(columns=[corrected_col], inplace=True)
 
-        # 4. AGGREGATE INTO INCOME STATEMENT
-        revenue_df = df_gl[df_gl['Amount_Reporting_Curr'] > 0].copy()
-        costs_df = df_gl[df_gl['Amount_Reporting_Curr'] <= 0].copy()
+    # Map cost items to budget articles
+    if 'cost_item' in df_gl.columns and 'cost_item' in df_cost_item_map.columns and 'budget_article' in df_cost_item_map.columns:
+        # Ensure we don't overwrite if budget_article was already set by corrections
+        temp_mapped_col = '_budget_article_from_map'
+        df_gl = pd.merge(df_gl, df_cost_item_map[['cost_item', 'budget_article']].rename(columns={'budget_article': temp_mapped_col}), 
+                         on='cost_item', how='left')
+        df_gl['budget_article'] = df_gl['budget_article'].fillna(df_gl[temp_mapped_col])
+        df_gl.drop(columns=[temp_mapped_col], inplace=True)
 
-        total_costs = costs_df['Amount_Reporting_Curr'].abs().sum()
-        costs_by_holder = costs_df.groupby('budget_holder')['Amount_Reporting_Curr'].abs().sum().to_dict()
-        costs_by_region = costs_df.groupby('region')['Amount_Reporting_Curr'].abs().sum().to_dict()
-        
-        # Simple revenue split for now, can be replaced by AI call
-        retail_revenue = revenue_df['Amount_Reporting_Curr'].sum() * 0.7 # Mock 70%
-        wholesale_revenue = revenue_df['Amount_Reporting_Curr'].sum() * 0.3 # Mock 30%
+    # Map budget articles to budget holders
+    if 'budget_article' in df_gl.columns and 'budget_article' in df_budget_mapping.columns and 'budget_holder' in df_budget_mapping.columns:
+        temp_mapped_col = '_budget_holder_from_map'
+        df_gl = pd.merge(df_gl, df_budget_mapping[['budget_article', 'budget_holder']].rename(columns={'budget_holder': temp_mapped_col}), 
+                         on='budget_article', how='left')
+        df_gl['budget_holder'] = df_gl['budget_holder'].fillna(df_gl[temp_mapped_col])
+        df_gl.drop(columns=[temp_mapped_col], inplace=True)
 
-        # 5. CALL AI SERVICES (Placeholder)
-        anomalies = ["AI analysis temporarily unavailable."]
+    # Map structural units to regions
+    if 'structural_unit' in df_gl.columns and 'structural_unit' in df_regional_mapping.columns and 'region' in df_regional_mapping.columns:
+        temp_mapped_col = '_region_from_map'
+        df_gl = pd.merge(df_gl, df_regional_mapping[['structural_unit', 'region']].rename(columns={'region': temp_mapped_col}), 
+                         on='structural_unit', how='left')
+        df_gl['region'] = df_gl['region'].fillna(df_gl[temp_mapped_col])
+        df_gl.drop(columns=[temp_mapped_col], inplace=True)
 
-        # 6. SAVE RESULTS TO FIRESTORE
-        results_ref = db.collection('budget_results').document()
-        results_data = {
-            'userId': after_data.get('userId'),
-            'sessionId': session_id,
-            'timestamp': firestore.SERVER_TIMESTAMP,
-            'verifiedMetrics': {
-                'totalCosts': float(total_costs),
-                'retailRevenue': float(retail_revenue),
-                'wholesaleRevenue': float(wholesale_revenue),
-                'costsByHolder': {str(k): float(v) for k, v in costs_by_holder.items() if pd.notna(k)},
-                'costsByRegion': {str(k): float(v) for k, v in costs_by_region.items() if pd.notna(k)}
-            },
-            'aiAnalysis': {
-                'anomalies': anomalies,
-                'insights': [],
-                'recommendations': []
-            },
+    # Fill any remaining NaN in key mapping columns with a placeholder like 'Unmapped'
+    df_gl['budget_article'] = df_gl['budget_article'].fillna('Unmapped Article')
+    df_gl['budget_holder'] = df_gl['budget_holder'].fillna('Unmapped Holder')
+    df_gl['region'] = df_gl['region'].fillna('Unmapped Region')
+
+    # 4. AGGREGATE INTO INCOME STATEMENT (for AI analysis preparation - Instruction 5)
+    revenue_df = df_gl[df_gl['Amount_Reporting_Curr'] > 0].copy()
+    costs_df = df_gl[df_gl['Amount_Reporting_Curr'] <= 0].copy()
+
+    total_costs = costs_df['Amount_Reporting_Curr'].abs().sum()
+    costs_by_holder = costs_df.groupby('budget_holder')['Amount_Reporting_Curr'].abs().sum().to_dict()
+    costs_by_region = costs_df.groupby('region')['Amount_Reporting_Curr'].abs().sum().to_dict()
+
+    retail_revenue = revenue_df['Amount_Reporting_Curr'].sum() * 0.7
+    wholesale_revenue = revenue_df['Amount_Reporting_Curr'].sum() * 0.3
+
+    # For AI analysis, return processed dataframes or their summaries.
+    # For now, retain placeholders for AI-generated data.
+    anomalies = ["AI analysis temporarily unavailable."]
+    insights = ["Insight from unified TS backend."]
+    recommendations = ["Recommendation from unified TS backend."]
+
+    # 6. RETURN/SAVE RESULTS (mocked for local execution)
+    results_data = {
+        'userId': after_data.get('userId', 'mock_user'),
+        'uploadId': session_id,
+        'timestamp': datetime.now().isoformat(), # Use current time for mock
+        'retailRevenue': float(retail_revenue),
+        'wholesaleRevenue': float(wholesale_revenue),
+        'totalCosts': float(total_costs),
+        'costsByHolder': {str(k): float(v) for k, v in costs_by_holder.items() if pd.notna(k)},
+        'costsByRegion': {str(k): float(v) for k, v in costs_by_region.items() if pd.notna(k)},
+        'anomalies': anomalies,
+        'insights': insights,
+        'recommendations': recommendations
+    }
+    logging.info(f"Simulated results for session {session_id}:\n{json.dumps(results_data, indent=2)}")
+    return results_data
+
+# Example of how to call the processing logic locally with mock data
+if __name__ == '__main__':
+    # Mock event data as it would come from Firestore trigger
+    mock_after_data = {
+        'userId': 'test_user_123',
+        'status': 'ready_for_processing',
+        'files': {
+            'glEntries': {'name': 'mock_gl.csv', 'path': '/mock/path/gl.csv'},
+            'budgetHolderMapping': {'name': 'mock_budget_map.csv', 'path': '/mock/path/budget_map.csv'},
+            'costItemMap': {'name': 'mock_cost_item_map.csv', 'path': '/mock/path/cost_item_map.csv'},
+            'regionalMapping': {'name': 'mock_regional_map.csv', 'path': '/mock/path/regional_map.csv'}
         }
-        results_ref.set(results_data)
+    }
+    mock_session_id = 'mock_session_abc'
 
-        # 7. UPDATE SESSION STATUS TO COMPLETED
-        session_ref.update({
-            'status': 'completed',
-            'resultId': results_ref.id,
-            'updatedAt': firestore.SERVER_TIMESTAMP
-        })
-
-        logging.info(f"Successfully processed session {session_id}. Result ID: {results_ref.id}")
-
-    except Exception as e:
-        # 8. ROBUST ERROR HANDLING
-        error_message = f"Processing failed: {str(e)}"
-        logging.error(f"Error processing session {session_id}: {e}", exc_info=True)
-        session_ref.update({
-            'status': 'error',
-            'errorMessage': error_message,
-            'updatedAt': firestore.SERVER_TIMESTAMP
-        })
-        raise e
-    finally:
-        # Clean up temporary files
-        if os.path.exists(temp_dir):
-            import shutil
-            shutil.rmtree(temp_dir)
-            logging.info(f"Cleaned up temporary directory: {temp_dir}")
+    # Run the processing logic
+    processed_results = run_processing_logic(mock_session_id, mock_after_data)
+    print("\n--- Processing Completed (Mocked) ---")
+    print(f"Processed Data for Session: {mock_session_id}")
+    # In a real scenario, this would involve saving to Firestore

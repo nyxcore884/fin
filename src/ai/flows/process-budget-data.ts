@@ -73,21 +73,17 @@ export async function processBudgetData(sessionId: string): Promise<void> {
     }
 
     // 4. Perform Calculations
-    const total_costs = costsDf.reduce((acc, row) => acc + Math.abs(row.Amount_Reporting_Curr), 0);
-    
-    const costs_by_holder: { [key: string]: number } = {};
-    costsDf.forEach(row => {
+    const { total_costs, costs_by_holder, costs_by_region } = costsDf.reduce((acc, row) => {
+        const amount = Math.abs(row.Amount_Reporting_Curr);
+        acc.total_costs += amount;
         if (row.budget_holder) {
-            costs_by_holder[row.budget_holder] = (costs_by_holder[row.budget_holder] || 0) + Math.abs(row.Amount_Reporting_Curr);
+            acc.costs_by_holder[row.budget_holder] = (acc.costs_by_holder[row.budget_holder] || 0) + amount;
         }
-    });
-
-    const costs_by_region: { [key: string]: number } = {};
-    costsDf.forEach(row => {
         if (row.region) {
-            costs_by_region[row.region] = (costs_by_region[row.region] || 0) + Math.abs(row.Amount_Reporting_Curr);
+            acc.costs_by_region[row.region] = (acc.costs_by_region[row.region] || 0) + amount;
         }
-    });
+        return acc;
+    }, { total_costs: 0, costs_by_holder: {} as { [key: string]: number }, costs_by_region: {} as { [key: string]: number } });
 
     // 5. AI Anomaly Detection
     const costs_by_holder_str = JSON.stringify(costs_by_holder);

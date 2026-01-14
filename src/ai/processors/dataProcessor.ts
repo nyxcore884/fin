@@ -1,167 +1,274 @@
 /**
- * @fileOverview This file contains utility functions for parsing and processing uploaded financial files.
- * It handles reading data, applying corrections, mapping, and aggregating financial entries.
+ * src/ai/processors/dataProcessor.ts
+ *
+ * Utility functions for parsing, correcting, mapping and aggregating
+ * financial data that has been uploaded to Firebase Storage (or any GCS bucket).
  */
 
-import { Bucket } from '@google-cloud/storage';
+import { Bucket } from '@google-cloud/storage';                 // <-- now available
 import { Readable } from 'stream';
-import * as xlsx from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import csv from 'csv-parser';
 
+// ---------------------------------------------------------------
+//  Types that describe the metadata stored in Firestore/Realtime DB
+// ---------------------------------------------------------------
 type FileMeta = {
-    name: string;
-    path: string;
-    uploadedAt: any;
+  name: string;
+  path: string;
+  uploadedAt: any;          // you probably store a timestamp – any is fine for now
 };
 
 type SessionFiles = {
-    glEntries: FileMeta;
-    budgetHolderMapping: FileMeta;
-    costItemMap: FileMeta;
-    regionalMapping: FileMeta;
-    corrections?: FileMeta;
-    revenueReport?: FileMeta;
+  glEntries: FileMeta;
+  budgetHolderMapping: FileMeta;
+  costItemMap: FileMeta;
+  regionalMapping: FileMeta;
+  corrections?: FileMeta;            // optional – may be undefined
+  revenueReport?: FileMeta;            // optional – may be undefined
 };
 
-// Helper to download a file from GCS and return a Buffer
+// ---------------------------------------------------------------
+//  Helper: download a file from GCS and turn it into a Buffer
+// ---------------------------------------------------------------
 async function downloadFile(bucket: Bucket, filePath: string): Promise<Buffer> {
-    const file = bucket.file(filePath);
-    const [buffer] = await file.download();
-    return buffer;
+  const file = bucket.file(filePath);
+
+  // The SDK returns `Promise<[Buffer, any]>`; we cast to `[Buffer, any]`
+  const [buffer] = await file.download() as Promise<[Buffer, any]>;
+
+  // No need to keep the destination file – we only need the in‑memory Buffer
+  return buffer;
 }
 
-// Helper to parse any file type (CSV or XLSX) from a buffer into JSON
+// ---------------------------------------------------------------
+//  Helper: decide whether a file is CSV or XLSX and parse it to JSON
+// ---------------------------------------------------------------
 async function parseFinancialFile(buffer: Buffer, fileName: string): Promise<any[]> {
-    if (fileName.toLowerCase().endsWith('.csv')) {
-        return new Promise((resolve, reject) => {
-            const results: any[] = [];
-            const stream = Readable.from(buffer);
-            stream
-                .pipe(csv({ bom: true })) // Handle BOM for UTF-8 files
-                .on('data', (data) => results.push(data))
-                .on('end', () => resolve(results))
-                .on('error', (error) => reject(error));
+  const ext = fileName.toLowerCase();
+
+  // ------------------- CSV -------------------
+  if (ext.endsWith('.csv')) {
+    // csv-parser does not ship a typings entry for `bom`, so we cast to `any`
+    const results: any[] = [];
+
+    // `Readable.from(buffer)` creates a readable stream from the Buffer.
+    // The options object is cast to `any` because its shape is not part of the
+    // declared type (`Options` does not contain `bom`).
+    const stream = Readable.from(buffer).pipe(
+      csv({
+        bom: true, // <- we know the option exists at runtime, just ignore the type
+      })
+    );
+
+    stream.on('data', (data: any) => results.push(data));
+    stream.on('end', () => {
+      // Resolve the promise after the stream ends
+      return results;
+    });
+    stream.on('error', (err: any) => {
+      // Throw so the outer Promise rejects
+      throw err;
+    });
+
+    // The above async function cannot `return` the promise directly, so we
+    // wrap it in a Promise constructor.
+    return new Promise<any[]>((resolve, reject) => {
+      const results: any[] = [];
+      const stream = Readable.from(buffer).pipe(csv({ bom: true }));
+      stream.on('data', (data: any) => results.push(data));
+      stream.on('end', () => resolve(results));
+      stream.on('error', (e) => reject(e));
+    });
+  }
+
+  // ------------------- XLSX / XLS -------------------
+  if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      return [];
+    }
+
+    // Build a header row from the first row of the sheet
+    const headerRow: string[] = [];
+    worksheet
+      .getRow(1)
+      .eachCell({ includeEmpty: true }, (cell) => {
+        headerRow.push(cell.value?.toString() ?? '');
+      });
+
+    const jsonData: any[] = [];
+
+    // Iterate over every subsequent row
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const rowData: Record<string, any> = {};
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const header = headerRow[colNumber - 1];
+          if (header) {
+            rowData[header] = cell.value;
+          }
         });
-    } else if (fileName.toLowerCase().endsWith('.xlsx') || fileName.toLowerCase().endsWith('.xls')) {
-        const workbook = xlsx.read(buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        return xlsx.utils.sheet_to_json(worksheet);
-    } else {
-        throw new Error(`Unsupported file type: ${fileName}`);
-    }
+        jsonData.push(rowData);
+      }
+    });
+
+    return jsonData;
+  }
+
+  // ------------------- Unknown extension -------------------
+  throw new Error(`Unsupported file type: ${fileName}`);
 }
 
-/**
- * Cleans and converts a string containing a number in various European formats.
- * @param value The string value to clean and convert.
- * @returns A number, or 0 if parsing fails.
- */
+// ---------------------------------------------------------------
+//  Helper: clean numeric strings with European separators
+// ---------------------------------------------------------------
 function cleanAndConvertNumeric(value: any): number {
-    if (typeof value === 'number') {
-        return value;
-    }
-    if (typeof value !== 'string') {
-        return 0;
-    }
-    // Remove whitespace, then replace comma decimal separator with a period.
-    const cleaned = value.replace(/\s/g, '').replace(',', '.');
-    if (!/^-?\d*\.?\d+$/.test(cleaned)) {
-        return 0;
-    }
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (typeof value !== 'string') {
+    return 0;
+  }
+  const cleaned = value.replace(/\s/g, '').replace(',', '.');
+  if (!/^-?\d*\.?\d+$/.test(cleaned)) {
+    return 0;
+  }
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
 }
 
-/**
- * Downloads, parses, corrects, maps, and aggregates financial data for a session.
- * This optimized version uses a single pass over the GL data to improve performance and memory usage.
- * @param files The file metadata from the session document.
- * @param bucket The Firebase Admin Storage bucket instance.
- * @returns An object with aggregated metrics and the detailed processed data.
- */
-export async function processUploadedFiles(files: SessionFiles, bucket: Bucket) {
-    // 1. Download and parse all files in parallel
-    const filePromises = [
-        downloadFile(bucket, files.glEntries.path).then(buffer => parseFinancialFile(buffer, files.glEntries.name)),
-        downloadFile(bucket, files.budgetHolderMapping.path).then(buffer => parseFinancialFile(buffer, files.budgetHolderMapping.name)),
-        downloadFile(bucket, files.costItemMap.path).then(buffer => parseFinancialFile(buffer, files.costItemMap.name)),
-        downloadFile(bucket, files.regionalMapping.path).then(buffer => parseFinancialFile(buffer, files.regionalMapping.name)),
-        files.corrections ? downloadFile(bucket, files.corrections.path).then(buffer => parseFinancialFile(buffer, files.corrections.name)) : Promise.resolve([]),
-    ];
+// ---------------------------------------------------------------
+//  Main processing function
+// ---------------------------------------------------------------
+export async function processUploadedFiles(
+  files: SessionFiles,
+  bucket: Bucket
+): Promise<{
+  totalRevenue: number;
+  totalCosts: number;
+  costsByHolder: Record<string, number>;
+  costsByRegion: Record<string, number>;
+  processedDf: any[];
+}> {
+  // -----------------------------------------------------------------
+  // 1️⃣ Parallel download & parsing of every uploaded file
+  // -----------------------------------------------------------------
+  const downloadAndParse = async (meta: FileMeta) => {
+    const buf = await downloadFile(bucket, meta.path);
+    return parseFinancialFile(buf, meta.name);
+  };
 
-    const [
-        glEntriesData,
-        budgetHolderMapData,
-        costItemMapData,
-        regionalMapData,
-        correctionsData,
-    ] = await Promise.all(filePromises);
+  const [
+    glEntriesData,          // GL entries (the raw financial rows)
+    budgetHolderMapData,    // maps budget_article → budget_holder
+    costItemMapData,        // maps cost_item → budget_article
+    regionalMapData,        // maps structural_unit → region
+    correctionsData = [],   // default to empty array if undefined
+  ] = await Promise.all([
+    downloadAndParse(files.glEntries),
+    downloadAndParse(files.budgetHolderMapping),
+    downloadAndParse(files.costItemMap),
+    downloadAndParse(files.regionalMapping),
+    // `corrections` may be missing – fall back to an empty array
+    files.corrections
+      ? downloadAndParse(files.corrections)
+      : Promise.resolve([]),
+  ]);
 
-    // 2. Create efficient lookup Maps for all mapping files.
-    const correctionsMap = new Map<string, any>(correctionsData.map(c => [c.Transaction_ID, c]));
-    const costItemMap = new Map<string, string>(costItemMapData.map(row => [row.cost_item, row.budget_article]));
-    const budgetHolderMap = new Map<string, string>(budgetHolderMapData.map(row => [row.budget_article, row.budget_holder]));
-    const regionalMap = new Map<string, string>(regionalMapData.map(row => [row.structural_unit, row.region]));
+  // -----------------------------------------------------------------
+  // 2️⃣ Build fast lookup maps for the *mapping* files
+  // -----------------------------------------------------------------
+  // Corrections map: key = Transaction_ID, value = full correction record
+  const correctionsMap = new Map<string, any>(correctionsData.map((c) => [
+    c.Transaction_ID,
+    c,
+  ]));
 
-    // 3. Process and aggregate in a single pass to optimize memory and performance.
-    const initialState = {
-        totalRevenue: 0,
-        totalCosts: 0,
-        costsByHolder: {} as Record<string, number>,
-        costsByRegion: {} as Record<string, number>,
-        processedDf: [] as any[],
+  // cost_item → budget_article
+  const costItemMap = new Map<string, string>(
+    costItemMapData.map((row) => [row.cost_item, row.budget_article])
+  );
+
+  // budget_article → budget_holder
+  const budgetHolderMap = new Map<string, string>(
+    budgetHolderMapData.map((row) => [row.budget_article, row.budget_holder])
+  );
+
+  // structural_unit → region
+  const regionalMap = new Map<string, string>(
+    regionalMapData.map((row) => [row.structural_unit, row.region])
+  );
+
+  // -----------------------------------------------------------------
+  // 3️⃣ Reduce the GL data in ONE pass – this is the memory‑efficient core
+  // -----------------------------------------------------------------
+  const initialState = {
+    totalRevenue: 0,
+    totalCosts: 0,
+    costsByHolder: {} as Record<string, number>,
+    costsByRegion: {} as Record<string, number>,
+    processedDf: [] as any[],
+  } as const;
+
+  const finalState = glEntriesData.reduce((acc, entry) => {
+    // ----- Apply a possible correction (if any) -----
+    const correction = correctionsMap.get(entry.Transaction_ID);
+    const mergedEntry = correction ? { ...entry, ...correction } : entry;
+
+    // ----- Clean the amount (handles European ',' → '.' & whitespace -----
+    const amount = cleanAndConvertNumeric(mergedEntry.Amount_Reporting_Curr);
+    if (!amount) {
+      // Skip rows that evaluate to 0 – they don’t affect aggregates
+      return acc;
+    }
+    // Store the cleaned amount back on the entry (helps downstream)
+    mergedEntry.Amount_Reporting_Curr = amount;
+
+    // ----- Resolve the mapping values -----
+    const budgetArticle = costItemMap.get(mergedEntry.cost_item);
+    const budgetHolder =
+      budgetArticle ? budgetHolderMap.get(budgetArticle) : undefined;
+    const region = regionalMap.get(mergedEntry.structural_unit);
+
+    const processedEntry = {
+      ...mergedEntry,
+      budget_article: budgetArticle,
+      budget_holder: budgetHolder,
+      region,
     };
 
-    const finalState = glEntriesData.reduce((acc, entry) => {
-        // Apply correction if it exists
-        const correction = correctionsMap.get(entry.Transaction_ID);
-        const mergedEntry = correction ? { ...entry, ...correction } : entry;
+    // ----- Aggregate -----
+    if (amount > 0) {
+      acc.totalRevenue += amount;
+    } else {
+      const abs = Math.abs(amount);
+      acc.totalCosts += abs;
+      if (budgetHolder) {
+        acc.costsByHolder[budgetHolder] = (acc.costsByHolder[budgetHolder] ?? 0) + abs;
+      }
+      if (region) {
+        acc.costsByRegion[region] = (acc.costsByRegion[region] ?? 0) + abs;
+      }
+    }
 
-        // Clean amount and filter out zero-value rows
-        const amount = cleanAndConvertNumeric(mergedEntry.Amount_Reporting_Curr);
-        if (amount === 0) {
-            return acc; // Skip rows with no financial impact
-        }
-        mergedEntry.Amount_Reporting_Curr = amount;
+    // Keep the fully‑processed row for downstream UI / export
+    acc.processedDf.push(processedEntry);
 
-        // Apply mappings
-        const budget_article = costItemMap.get(mergedEntry.cost_item);
-        const budget_holder = budget_article ? budgetHolderMap.get(budget_article) : undefined;
-        const region = regionalMap.get(mergedEntry.structural_unit);
-        
-        const processedEntry = {
-            ...mergedEntry,
-            budget_article,
-            budget_holder,
-            region,
-        };
+    return acc;
+  }, initialState);
 
-        // Aggregate data
-        if (amount > 0) {
-            acc.totalRevenue += amount;
-        } else {
-            const absAmount = Math.abs(amount);
-            acc.totalCosts += absAmount;
-            if (budget_holder) {
-                acc.costsByHolder[budget_holder] = (acc.costsByHolder[budget_holder] || 0) + absAmount;
-            }
-            if (region) {
-                acc.costsByRegion[region] = (acc.costsByRegion[region] || 0) + absAmount;
-            }
-        }
-        
-        acc.processedDf.push(processedEntry);
-
-        return acc;
-    }, initialState);
-
-    // 4. Return aggregated metrics and the full processed dataframe
-    return {
-        totalRevenue: finalState.totalRevenue,
-        totalCosts: finalState.totalCosts,
-        costsByHolder: finalState.costsByHolder,
-        costsByRegion: finalState.costsByRegion,
-        processedDf: finalState.processedDf,
-    };
+  // -----------------------------------------------------------------
+  // 4️⃣ Return the aggregated metrics + the full processed dataframe
+  // -----------------------------------------------------------------
+  return {
+    totalRevenue: finalState.totalRevenue,
+    totalCosts: finalState.totalCosts,
+    costsByHolder: finalState.costsByHolder,
+    costsByRegion: finalState.costsByRegion,
+    processedDf: finalState.processedDf,
+  };
 }

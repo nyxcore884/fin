@@ -11,9 +11,11 @@ import {
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/firebase/client';
 import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AuthContextType {
   user: User | null;
+  anonymousId: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
@@ -24,12 +26,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [anonymousId, setAnonymousId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      if (!user) {
+        // If no user is logged in, manage anonymous ID
+        let sessionId = sessionStorage.getItem('anonymousId');
+        if (!sessionId) {
+          sessionId = uuidv4();
+          sessionStorage.setItem('anonymousId', sessionId);
+        }
+        setAnonymousId(sessionId);
+      } else {
+        // If user is logged in, clear anonymous ID
+        sessionStorage.removeItem('anonymousId');
+        setAnonymousId(null);
+      }
       setLoading(false);
     });
     return () => unsubscribe();
@@ -44,12 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const user = userCredential.user;
 
     if (user) {
-        // Create a user profile document in Firestore
         const userRef = doc(db, 'users', user.uid);
-        
-        // Define admin emails
         const adminEmails = ['valleysofpluto@gmail.com'];
-        
         await setDoc(userRef, {
             email: user.email,
             role: adminEmails.includes(user.email!) ? 'admin' : 'viewer',
@@ -68,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, anonymousId, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

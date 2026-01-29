@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Query,
   onSnapshot,
@@ -60,6 +60,7 @@ export function useCollection<T = any>(
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
+  const dataMap = useRef<Map<string, ResultItemType>>(new Map());
 
   useEffect(() => {
     if (!memoizedTargetRefOrQuery) {
@@ -73,14 +74,49 @@ export function useCollection<T = any>(
     setError(null);
 
     // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
+    let isFirstSnapshot = true;
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
-        const results: ResultItemType[] = [];
-        for (const doc of snapshot.docs) {
-          results.push({ ...(doc.data() as T), id: doc.id });
+        if (isFirstSnapshot) {
+          dataMap.current.clear();
+          const results: ResultItemType[] = [];
+          for (const doc of snapshot.docs) {
+            const item = { ...(doc.data() as T), id: doc.id };
+            dataMap.current.set(doc.id, item);
+            results.push(item);
+          }
+          setData(results);
+          isFirstSnapshot = false;
+        } else {
+          const changes = snapshot.docChanges();
+
+          // Update the internal Map
+          changes.forEach((change) => {
+            if (change.type === 'removed') {
+              dataMap.current.delete(change.doc.id);
+            } else {
+              const item = { ...(change.doc.data() as T), id: change.doc.id };
+              dataMap.current.set(change.doc.id, item);
+            }
+          });
+
+          // Rebuild the array based on snapshot.docs order
+          // This ensures correct sorting and filtering as determined by the query
+          const results: ResultItemType[] = [];
+          for (const doc of snapshot.docs) {
+             const item = dataMap.current.get(doc.id);
+             if (item) {
+               results.push(item);
+             } else {
+               // Fallback just in case (e.g. if 'added' event was somehow missed or map out of sync)
+               const fallback = { ...(doc.data() as T), id: doc.id };
+               dataMap.current.set(doc.id, fallback);
+               results.push(fallback);
+             }
+          }
+          setData(results);
         }
-        setData(results);
         setError(null);
         setIsLoading(false);
       },

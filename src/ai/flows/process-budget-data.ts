@@ -49,28 +49,40 @@ export async function processBudgetData(sessionId: string): Promise<void> {
     // 2. Process the uploaded files from Cloud Storage
     const { processedDf, revenueDf, costsDf } = await processUploadedFiles(sessionData.files, storage.bucket());
     
-    // 3. AI-Powered Revenue Classification
-    let retail_revenue = 0;
-    let wholesale_revenue = 0;
+    // 3. AI-Powered Revenue Classification (Parallelized)
+    const classificationPromises = revenueDf.map(row => {
+      const entry_description = row.counterparty || '';
+      if (entry_description) {
+        const ai_input = {
+          revenueEntry: entry_description,
+          keywordsRetail: "individual, person, private",
+          keywordsWholesale: "company, organization, ltd, llc"
+        };
+        return classifyRevenue(ai_input).then(result => ({
+          amount: row.Amount_Reporting_Curr,
+          classification: result.classification,
+        }));
+      } else {
+        return Promise.resolve({
+          amount: row.Amount_Reporting_Curr,
+          classification: 'retail', // Default to retail
+        });
+      }
+    });
 
-    for (const row of revenueDf) {
-        const entry_description = row.counterparty || '';
-        if (entry_description) {
-            const ai_input = {
-                revenueEntry: entry_description,
-                keywordsRetail: "individual, person, private",
-                keywordsWholesale: "company, organization, ltd, llc"
-            };
-            const classification_result = await classifyRevenue(ai_input);
-            if (classification_result.classification === 'wholesale') {
-                wholesale_revenue += row.Amount_Reporting_Curr;
-            } else {
-                retail_revenue += row.Amount_Reporting_Curr;
-            }
+    const classifications = await Promise.all(classificationPromises);
+
+    const { retail_revenue, wholesale_revenue } = classifications.reduce(
+      (acc, result) => {
+        if (result.classification === 'wholesale') {
+          acc.wholesale_revenue += result.amount;
         } else {
-            retail_revenue += row.Amount_Reporting_Curr; // Default to retail
+          acc.retail_revenue += result.amount;
         }
-    }
+        return acc;
+      },
+      { retail_revenue: 0, wholesale_revenue: 0 }
+    );
 
     // 4. Perform Calculations
     const total_costs = costsDf.reduce((acc, row) => acc + Math.abs(row.Amount_Reporting_Curr), 0);
